@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ học Automata (với AI)</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải Cytoscape.js (thư viện vẽ đồ thị) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <!-- Tải layout extension (ví dụ: breadthfirst) -->
+    <script src="https://unpkg.com/cytoscape-breadthfirst@2.0.1/cytoscape-breadthfirst.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Cần một chiều cao cụ thể cho Cytoscape */
+        #cy {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            background-color: #fdfdfd;
+        }
+
+        /* Kiểu cho thông báo */
+        .message-box {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 500;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        .message-success {
+            background-color: #28a745; /* Màu xanh lá */
+        }
+        .message-error {
+            background-color: #dc3545; /* Màu đỏ */
+        }
+
+        /* Thêm kiểu cho mô phỏng */
+        .current-state {
+            background-color: #fde047; /* yellow-300 */
+            border-color: #facc15; /* yellow-500 */
+            border-width: 4px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .traversed-edge {
+            line-color: #2563eb; /* blue-600 */
+            target-arrow-color: #2563eb;
+            width: 4px;
+            opacity: 0.8;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Thêm kiểu cho băng TM */
+        #tm-tape-container {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            text-align: center;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 5px;
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            margin-top: 1rem;
+            min-height: 50px;
+        }
+        .tape-cell {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            border: 1px solid #9ca3af;
+            background-color: #fff;
+            margin: 0 1px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .tape-head {
+            border: 2px solid #ef4444; /* red-500 */
+            background-color: #fee2e2; /* red-100 */
+            font-weight: bold;
+            transform: scale(1.1);
+        }
+
+        /* Modal cho Gemini */
+        .modal {
+            display: none; /* Ẩn mặc định */
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 24px;
+            border: 1px solid #888;
+            border-radius: 0.5rem;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-close:hover,
+        .modal-close:focus {
+            color: black;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            display: none; /* Ẩn mặc định */
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Test case list */
+        .test-case-list {
+            font-size: 0.875rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .test-case-list:hover {
+            background-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-md w-full">
+        <div class="container mx-auto px-4 py-3">
+            <h1 class="text-2xl font-bold text-blue-600">Công cụ học Automata (với Gemini AI)</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-grow flex flex-col md:flex-row p-4 gap-4" style="height: calc(100vh - 60px);">
+
+        <!-- Bảng điều khiển (Controls) -->
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Bảng điều khiển</h2>
+
+            <!-- Lựa chọn loại Automata -->
+            <div class="mb-4">
+                <label for="automata-type" class="block text-sm font-medium mb-1">Loại Automata:</label>
+                <select id="automata-type" class="w-full p-2 border rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="DFA">DFA (Đơn định)</option>
+                    <option value="NFA">NFA (Không đơn định)</option>
+                    <option value="TM">Turing Machine</option>
+                </select>
+            </div>
+
+            <!-- Định nghĩa bảng chữ cái -->
+            <div class="mb-4">
+                <label for="alphabet-input" class="block text-sm font-medium mb-1">Bảng chữ cái (cách nhau bằng dấu phẩy):</label>
+                <input type="text" id="alphabet-input" value="a,b" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="a,b">
+            </div>
+
+            <!-- Ký tự trống (CHỈ DÀNH CHO TM) -->
+            <div id="tm-blank-symbol-div" class="mb-4 hidden">
+                <label for="tm-blank-symbol" class="block text-sm font-medium mb-1">Ký tự trống (Blank Symbol):</label>
+                <input type="text" id="tm-blank-symbol" value="_" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="_, B, v.v.">
+            </div>
+            
+            <!-- TÍNH NĂNG MỚI: Tạo đồ thị từ AI -->
+            <fieldset class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">✨ Tạo Automata (AI)</legend>
+                <label for="gemini-prompt" class="block text-sm font-medium mb-1">Nhập yêu cầu của bạn:</label>
+                <textarea id="gemini-prompt" rows="3" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ví dụ: DFA chấp nhận chuỗi kết thúc bằng 'a'"></textarea>
+                <button id="generate-graph" class="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150">Tạo Đồ thị</button>
+            </fieldset>
+            <!-- KẾT THÚC TÍNH NĂNG MỚI -->
+
+            <!-- Thao tác với trạng thái -->
+            <fieldset class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Trạng thái (Thủ công)</legend>
+                <button id="add-state" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Thêm Trạng thái</button>
+                <button id="set-start" class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Đặt làm Bắt đầu</button>
+                <button id="set-final" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-medium py-2 px-4 rounded-md transition duration-150">Chuyển đổi Kết thúc</button>
+            </fieldset>
+
+            <!-- Thao tác với đường chuyển (DFA/NFA) -->
+            <fieldset id="dfa-nfa-edge-controls" class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Đường chuyển (DFA/NFA)</legend>
+                <div class="text-sm mb-2" id="selection-status-dfa">
+                    <p>Nguồn: <span id="source-node-dfa" class="font-mono text-blue-700">chưa chọn</span></p>
+                    <p>Đích: <span id="target-node-dfa" class="font-mono text-blue-700">chưa chọn</span></p>
+                </div>
+                <label for="edge-symbols" class="block text-sm font-medium mb-1">Ký tự (cho NFA: a,b; epsilon: e):</label>
+                <input type="text" id="edge-symbols" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="a">
+                <button id="add-edge-dfa-nfa" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-md transition duration-150">Thêm Đường chuyển</button>
+            </fieldset>
+
+            <!-- Thao tác với đường chuyển (TURING MACHINE) -->
+            <fieldset id="tm-edge-controls" class="border rounded-md p-3 mb-4 hidden">
+                <legend class="text-md font-semibold px-2">Đường chuyển (Turing Machine)</legend>
+                <div class="text-sm mb-2" id="selection-status-tm">
+                    <p>Nguồn: <span id="source-node-tm" class="font-mono text-blue-700">chưa chọn</span></p>
+                    <p>Đích: <span id="target-node-tm" class="font-mono text-blue-700">chưa chọn</span></p>
+                </div>
+                
+                <label for="tm-read-symbol" class="block text-sm font-medium mb-1">Đọc (Read):</label>
+                <input type="text" id="tm-read-symbol" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="a (hoặc ký tự trống)">
+                
+                <label for="tm-write-symbol" class="block text-sm font-medium mb-1">Viết (Write):</label>
+                <input type="text" id="tm-write-symbol" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="b (hoặc ký tự trống)">
+                
+                <label for="tm-move-direction" class="block text-sm font-medium mb-1">Di chuyển (Move):</label>
+                <select id="tm-move-direction" class="w-full p-2 border rounded-md mb-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="R">Phải (R)</option>
+                    <option value="L">Trái (L)</option>
+                </select>
+
+                <button id="add-edge-tm" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-md transition duration-150">Thêm Đường chuyển</button>
+            </fieldset>
+
+            <!-- Xóa và Xóa lựa chọn -->
+            <fieldset class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Khác</legend>
+                <button id="delete-selected" class="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Xóa (Đã chọn)</button>
+                <button id="clear-selection" class="w-full bg-gray-400 hover:bg-gray-500 text-black font-medium py-2 px-4 rounded-md transition duration-150">Bỏ chọn</button>
+            </fieldset>
+
+        </div>
+
+        <!-- Khu vực vẽ (Cytoscape) -->
+        <div class="w-full md:w-3/4 lg:w-4/5 h-full flex flex-col bg-white rounded-lg shadow-lg">
+            <div id="cy" class="flex-grow"></div>
+        </div>
+
+        <!-- Bảng kiểm tra (Test) -->
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Kiểm tra & Thực thi</h2>
+            
+            <!-- Loading Spinner -->
+            <div id="gemini-loader" class="loader mb-4"></div>
+            
+            <!-- Nút Tính năng Gemini -->
+            <div class="mb-4">
+                <button id="explain-automata" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">✨ Giải thích Automata này</button>
+                <button id="validate-graph" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-md transition duration-150">Kiểm tra tính hợp lệ (DFA)</button>
+            </div>
+
+            <!-- Khu vực Test chuỗi -->
+            <fieldset class="border rounded-md p-3">
+                <legend class="text-md font-semibold px-2">Thực thi chuỗi</legend>
+                <label for="test-string" class="block text-sm font-medium mb-1">Chuỗi đầu vào:</label>
+                <input type="text" id="test-string" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="abba">
+                
+                <label for="sim-speed" class="block text-sm font-medium mb-1">Tốc độ (ms/bước):</label>
+                <select id="sim-speed" class="w-full p-2 border rounded-md mb-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="200">Rất nhanh (200ms)</option>
+                    <option value="500">Nhanh (500ms)</option>
+                    <option value="1000">Trung bình (1000ms)</option>
+                    <option value="2000">Chậm (2000ms)</option>
+                </select>
+
+                <div class="flex gap-2">
+                    <button id="run-test" class="w-1/2 bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 px-4 rounded-md transition duration-150">Mô phỏng</button>
+                    <button id="reset-sim" class="w-1/2 bg-gray-400 hover:bg-gray-500 text-black font-medium py-2 px-4 rounded-md transition duration-150">Reset</button>
+                </div>
+                
+                <div class="mt-2 p-3 bg-gray-100 rounded-md text-center">
+                    <p class="text-sm font-medium">Kết quả:</p>
+                    <p id="test-result" class="text-lg font-bold">---</p>
+                </div>
+
+                <!-- Container cho Băng TM -->
+                <div id="tm-tape-container" class="hidden"></div>
+                
+                <!-- Gợi ý Test Case từ Gemini -->
+                <button id="suggest-test-cases" class="w-full bg-gradient-to-r from-sky-500 to-cyan-600 hover:from-sky-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mt-4">✨ Gợi ý Test</button>
+                <div id="test-case-container" class="mt-2"></div>
+
+            </fieldset>
+        </div>
+
+    </div>
+
+    <!-- Hộp thông báo (ẩn mặc định) -->
+    <div id="message-box" class="message-box"></div>
+
+    <!-- Modal cho Gemini Explanation -->
+    <div id="gemini-modal" class="modal">
+        <div class="modal-content">
+            <span id="modal-close" class="modal-close">&times;</span>
+            <h3 class="text-xl font-semibold mb-3">✨ Giải thích từ Gemini</h3>
+            <div id="gemini-explanation" class="text-gray-700 whitespace-pre-wrap">Đang tải...</div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // --- BIẾN TOÀN CỤC ---
+        let cy;
+        let stateCounter = 0;
+        let startState = null;
+        let finalStates = new Set();
+        let automataType = 'DFA';
+        let alphabet = new Set(['a', 'b']);
+        
+        let sourceNode = null;
+        let targetNode = null;
+
+        const EPSILON = 'e'; // Ký tự đại diện cho Epsilon
+        
+        // BIẾN API (Để trống, sẽ được cung cấp bởi môi trường)
+        const apiKey = "AIzaSyBbkzptNoC8lXLH8D65HC8Hn7TreipxyeI"; 
+
+        // --- KHỞI TẠO CYTOSCAPE ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Đăng ký layout
+            // cytoscape.use( cytoscapeBreadthfirst ); // BỎ DÒNG NÀY ĐI - Thư viện đã tự đăng ký khi được import
+ 
+            const cyContainer = document.getElementById('cy'); // Lấy container element
+            
+            cy = cytoscape({
+                container: cyContainer, // Sử dụng container element
+                
+                // Các phần tử ban đầu (rỗng)
+                elements: [], 
+                
+                // Kiểu dáng cho đồ thị
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#fff',
+                            'border-color': '#666',
+                            'border-width': 2,
+                            'label': 'data(id)',
+                            'width': 40,
+                            'height': 40,
+                            'text-valign': 'center',
+                            'color': '#000',
+                            'font-size': 14,
+                            'font-weight': 'bold',
+                            'transition-property': 'background-color, border-color, border-width',
+                            'transition-duration': '0.2s'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#666',
+                            'target-arrow-shape': 'triangle',
+                            'target-arrow-color': '#666',
+                            'label': 'data(label)',
+                            'font-size': 12,
+                            'font-weight': 'medium',
+                            'color': '#333',
+                            'text-background-opacity': 1,
+                            'text-background-color': '#fff',
+                            'text-background-padding': 3,
+                            'curve-style': 'bezier',
+                            'control-point-distance': 20, // Giúp các cạnh vòng (loop) dễ thấy hơn
+                            'loop-direction': '0deg',
+                            'loop-sweep': '-40deg', // Điều chỉnh cạnh vòng
+                            'transition-property': 'line-color, target-arrow-color, width, opacity',
+                            'transition-duration': '0.2s'
+                        }
+                    },
+                    {
+                        selector: '.start-state', // Kiểu cho trạng thái bắt đầu
+                        style: {
+                            'border-color': '#28a745',
+                            'border-width': 4,
+                            'background-color': '#e6ffed'
+                        }
+                    },
+                    {
+                        selector: '.final-state', // Kiểu cho trạng thái kết thúc
+                        style: {
+                            'border-color': '#333',
+                            'border-width': 4,
+                            'border-style': 'double' // Vòng tròn kép
+                        }
+                    },
+                    {
+                        selector: ':selected', // Kiểu khi được chọn
+                        style: {
+                            'background-color': '#a0deff',
+                            'line-color': '#007bff',
+                            'target-arrow-color': '#007bff',
+                            'border-color': '#007bff',
+                            'border-width': 3
+                        }
+                    },
+                    // Lớp CSS cho mô phỏng
+                    {
+                        selector: '.current-state',
+                        style: {
+                            'background-color': '#fde047', /* yellow-300 */
+                            'border-color': '#facc15', /* yellow-500 */
+                            'border-width': 4,
+                        }
+                    },
+                    {
+                        selector: '.traversed-edge',
+                        style: {
+                            'line-color': '#2563eb', /* blue-600 */
+                            'target-arrow-color': '#2563eb',
+                            'width': 4,
+                            'opacity': 0.8,
+                        }
+                    }
+                ],
+                
+                // Bố cục
+                layout: {
+                    name: 'preset' // Cho phép người dùng tự kéo thả
+                }
+            });
+
+            // Bắt sự kiện click vào node để chọn nguồn/đích
+            cy.on('tap', 'node', (evt) => {
+                const node = evt.target;
+
+                if (!sourceNode) {
+                    sourceNode = node;
+                    node.select();
+                } else if (!targetNode) {
+                    targetNode = node;
+                    node.select();
+                } else {
+                    // Đã chọn cả hai, đặt lại
+                    clearSelection();
+                    sourceNode = node;
+                    node.select();
+                }
+                updateSelectionUI();
+            });
+
+            // Bỏ chọn khi nhấn vào nền
+            cy.on('tap', (evt) => {
+                if (evt.target === cy) {
+                    clearSelection();
+                }
+            });
+
+            // THAY ĐỔI: Sử dụng 'Chuột Phải' (cxttap) để thêm node
+            cy.on('cxttap', (evt) => {
+                // Chỉ thêm node nếu chuột phải vào nền (không phải node/cạnh)
+                if (evt.target === cy) {
+                    
+                    const newNodeId = `q${stateCounter++}`;
+                    cy.add({
+                        group: 'nodes',
+                        data: { id: newNodeId },
+                        position: evt.position // Sử dụng vị trí chuột phải
+                    });
+                }
+            });
+            // KẾT THÚC THAY ĐỔI
+
+            // --- GÁN SỰ KIỆN CHO CÁC NÚT ĐIỀU KHIỂN ---
+
+            // Lắng nghe thay đổi loại Automata
+            document.getElementById('automata-type').addEventListener('change', (e) => {
+                automataType = e.target.value;
+                const dfaNfaControls = document.getElementById('dfa-nfa-edge-controls');
+                const tmControls = document.getElementById('tm-edge-controls');
+                const tmBlankSymbol = document.getElementById('tm-blank-symbol-div');
+
+                if (automataType === 'TM') {
+                    dfaNfaControls.classList.add('hidden');
+                    tmControls.classList.remove('hidden');
+                    tmBlankSymbol.classList.remove('hidden');
+                } else {
+                    dfaNfaControls.classList.remove('hidden');
+                    tmControls.classList.add('hidden');
+                    tmBlankSymbol.classList.add('hidden');
+                }
+                showMessage(`Chuyển sang chế độ: ${automataType}`, 'success');
+                resetSimulation(); // Reset khi đổi loại
+            });
+
+            // Lắng nghe thay đổi bảng chữ cái
+            document.getElementById('alphabet-input').addEventListener('change', (e) => {
+                const chars = e.target.value.split(',').filter(c => c.trim().length > 0).map(c => c.trim());
+                alphabet = new Set(chars);
+                console.log("Bảng chữ cái đã cập nhật:", alphabet);
+            });
+            
+            // Nút Thêm Trạng thái (đã được kích hoạt lại)
+            document.getElementById('add-state').addEventListener('click', () => {
+                const newNodeId = `q${stateCounter++}`;
+                // Lấy vị trí trung tâm màn hình vẽ
+                const center = cy.extent();
+                cy.add({
+                    group: 'nodes',
+                    data: { id: newNodeId },
+                    position: {
+                        x: center.x1 + (center.w / 2) + (Math.random() * 50 - 25), // Thêm chút ngẫu nhiên để không bị trùng
+                        y: center.y1 + (center.h / 2) + (Math.random() * 50 - 25)
+                    }
+                });
+            });
+
+
+            // Nút Đặt làm Bắt đầu
+            document.getElementById('set-start').addEventListener('click', () => {
+                const selected = cy.$('node:selected');
+                if (selected.length !== 1) {
+                    showMessage("Vui lòng chọn ĐÚNG MỘT trạng thái để đặt làm bắt đầu.", "error");
+                    return;
+                }
+                
+                // Bỏ trạng thái bắt đầu cũ (nếu có)
+                if (startState) {
+                    cy.getElementById(startState).removeClass('start-state');
+                }
+                
+                // Đặt trạng thái mới
+                startState = selected.id();
+                selected.addClass('start-state');
+                showMessage(`Trạng thái ${startState} đã được đặt làm bắt đầu.`, "success");
+            });
+
+            // Nút Chuyển đổi Kết thúc
+            document.getElementById('set-final').addEventListener('click', () => {
+                const selected = cy.$('node:selected');
+                if (selected.length === 0) {
+                    showMessage("Vui lòng chọn ít nhất MỘT trạng thái.", "error");
+                    return;
+                }
+                
+                selected.forEach(node => {
+                    if (finalStates.has(node.id())) {
+                        finalStates.delete(node.id());
+                        node.removeClass('final-state');
+                    } else {
+                        finalStates.add(node.id());
+                        node.addClass('final-state');
+                    }
+                });
+            });
+
+            // Nút Thêm Đường chuyển (DFA/NFA)
+            document.getElementById('add-edge-dfa-nfa').addEventListener('click', addEdgeDfaNfa);
+            
+            // Nút Thêm Đường chuyển (TM)
+            document.getElementById('add-edge-tm').addEventListener('click', addEdgeTm);
+
+            // Nút Xóa (Đã chọn)
+            document.getElementById('delete-selected').addEventListener('click', () => {
+                const selected = cy.$(':selected');
+                if (selected.length > 0) {
+                    selected.forEach(ele => {
+                        if (ele.isNode()) {
+                            if (ele.id() === startState) startState = null;
+                            finalStates.delete(ele.id());
+                        }
+                    });
+                    cy.remove(selected);
+                    clearSelection();
+                } else {
+                    showMessage("Không có gì được chọn để xóa.", "error");
+                }
+            });
+
+            // Nút Bỏ chọn
+            document.getElementById('clear-selection').addEventListener('click', clearSelection);
+
+            // Nút Kiểm tra tính hợp lệ
+            document.getElementById('validate-graph').addEventListener('click', validateGraph);
+
+            // Nút Chạy thử (Mô phỏng)
+            document.getElementById('run-test').addEventListener('click', startSimulation);
+
+            // Nút Reset Mô phỏng
+            document.getElementById('reset-sim').addEventListener('click', resetSimulation);
+            
+            // --- NÚT GEMINI ---
+            document.getElementById('generate-graph').addEventListener('click', handleGenerateGraph);
+            document.getElementById('explain-automata').addEventListener('click', handleExplainAutomata);
+            document.getElementById('suggest-test-cases').addEventListener('click', handleSuggestTestCases);
+
+            // --- Modal ---
+            const modal = document.getElementById('gemini-modal');
+            const modalClose = document.getElementById('modal-close');
+            modalClose.onclick = () => modal.style.display = "none";
+            window.onclick = (event) => {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+        });
+        
+        // --- HÀM HỖ TRỢ GEMINI ---
+        
+        function showLoader(isLoading) {
+            document.getElementById('gemini-loader').style.display = isLoading ? 'block' : 'none';
+        }
+
+        /**
+         * Chuyển đổi đồ thị hiện tại thành một mô tả bằng văn bản cho LLM.
+         */
+        function serializeGraph() {
+            let desc = `Đây là một ${automataType}.\n`;
+            desc += `Bảng chữ cái (Alphabet): {${Array.from(alphabet).join(', ')}}\n`;
+            desc += `Trạng thái bắt đầu (Start State): ${startState}\n`;
+            desc += `Trạng thái kết thúc (Final States): {${Array.from(finalStates).join(', ')}}\n`;
+            
+            if (automataType === 'TM') {
+                desc += `Ký tự trống (Blank Symbol): ${document.getElementById('tm-blank-symbol').value.trim() || '_'}\n`;
+                desc += "Các đường chuyển (Transitions):\n";
+                cy.edges().forEach(edge => {
+                    const data = edge.data();
+                    // Chỉ serialize cạnh TM
+                    if (data.tm_read !== undefined) {
+                        desc += `  - Từ ${data.source} đến ${data.target}: (Đọc: ${data.tm_read}, Viết: ${data.tm_write}, Di chuyển: ${data.tm_move})\n`;
+                    }
+                });
+            } else { // DFA/NFA
+                desc += "Các đường chuyển (Transitions):\n";
+                cy.edges().forEach(edge => {
+                    const data = edge.data();
+                    // Bỏ qua các cạnh TM nếu có
+                    if (data.tm_read === undefined) {
+                        desc += `  - Từ ${data.source} đến ${data.target} với ký tự: ${data.label}\n`;
+                    }
+                });
+            }
+            return desc;
+        }
+
+        /**
+         * Gọi API Gemini
+         */
+        async function callGemini(systemPrompt, userPrompt, jsonSchema = null) {
+            showLoader(true);
+            const model = "gemini-2.5-flash-preview-09-2025";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+            
+            // Nếu yêu cầu JSON, thêm generationConfig
+            if (jsonSchema) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: jsonSchema
+                };
+            }
+
+            try {
+                // Thêm retry logic đơn giản
+                let response;
+                for (let i = 0; i < 3; i++) { // Thử lại 3 lần
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) break;
+                    await sleep(1000 * (i + 1)); // Backoff
+                }
+
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content?.parts?.[0]?.text) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    console.error("Phản hồi API không hợp lệ:", result);
+                    if (result.candidates && result.candidates[0].finishReason === 'SAFETY') {
+                        throw new Error("Yêu cầu bị chặn vì lý do an toàn.");
+                    }
+                    throw new Error("Không nhận được nội dung từ API.");
+                }
+            } catch (error) {
+                console.error("Lỗi khi gọi Gemini API:", error);
+                showMessage("Lỗi: Không thể kết nối đến Gemini API. " + error.message, "error");
+                return null;
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        /**
+         * Xử lý sự kiện "Tạo Đồ thị"
+         */
+        async function handleGenerateGraph() {
+            const prompt = document.getElementById('gemini-prompt').value;
+            if (!prompt) {
+                showMessage("Vui lòng nhập yêu cầu của bạn.", "error");
+                return;
+            }
+
+            const currentAutomataType = automataType; // Lấy loại automata hiện tại
+            const currentAlphabet = Array.from(alphabet).join(', ');
+            const currentBlankSymbol = document.getElementById('tm-blank-symbol').value.trim() || '_';
+
+            const systemPrompt = `Bạn là một chuyên gia lý thuyết automata. Nhiệm vụ của bạn là tạo ra một cấu trúc đồ thị JSON dựa trên yêu cầu của người dùng.
+Hãy tuân thủ nghiêm ngặt JSON schema được cung cấp.
+Sử dụng các ID trạng thái đơn giản như 'q0', 'q1', 'q2'.
+Đảm bảo 'startState' là một trong các ID trạng thái bạn đã tạo.
+Đảm bảo 'finalStates' là một mảng các ID trạng thái hợp lệ.
+Đối với ${currentAutomataType}:
+- ${currentAutomataType === 'TM' ? "Chỉ cung cấp các trường 'read', 'write', 'move' cho các cạnh." : "Chỉ cung cấp trường 'label' cho các cạnh."}
+- ${currentAutomataType === 'DFA' ? "Đảm bảo mọi trạng thái đều có đường chuyển cho mọi ký tự trong bảng chữ cái." : ""}
+- ${currentAutomataType === 'NFA' ? "Bạn có thể sử dụng 'e' cho đường chuyển epsilon trong trường 'label'." : ""}`;
+            
+            const userPrompt = `Tạo một ${currentAutomataType} cho yêu cầu sau: "${prompt}".
+Bảng chữ cái là: {${currentAlphabet}}.
+${currentAutomataType === 'TM' ? `Ký tự trống là: '${currentBlankSymbol}'.` : ''}
+Hãy tạo đồ thị.`;
+
+            // JSON Schema cho LLM
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    nodes: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: { id: { type: "STRING" } },
+                            required: ["id"]
+                        }
+                    },
+                    edges: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                source: { type: "STRING" },
+                                target: { type: "STRING" },
+                                label: { type: "STRING" }, // For DFA/NFA
+                                read: { type: "STRING" },  // For TM
+                                write: { type: "STRING" }, // For TM
+                                move: { type: "STRING" }   // For TM
+                            },
+                            required: ["source", "target"]
+                        }
+                    },
+                    startState: { type: "STRING" },
+                    finalStates: {
+                        type: "ARRAY",
+                        items: { type: "STRING" }
+                    }
+                },
+                required: ["nodes", "edges", "startState", "finalStates"]
+            };
+
+            const jsonString = await callGemini(systemPrompt, userPrompt, schema);
+
+            if (!jsonString) {
+                showMessage("Không thể tạo đồ thị từ AI.", "error");
+                return;
+            }
+
+            try {
+                const graphData = JSON.parse(jsonString);
+                drawGraphFromData(graphData);
+            } catch (e) {
+                console.error("Lỗi parse JSON từ Gemini:", e, jsonString);
+                showMessage("Lỗi: AI trả về dữ liệu không hợp lệ.", "error");
+            }
+        }
+
+        /**
+         * Xử lý sự kiện "Giải thích Automata"
+         */
+        async function handleExplainAutomata() {
+            if (!startState) {
+                showMessage("Vui lòng đặt trạng thái bắt đầu trước.", "error");
+                return;
+            }
+            
+            const graphDescription = serializeGraph();
+            const systemPrompt = "Bạn là một giáo sư khoa học máy tính chuyên về lý thuyết automata. Hãy giải thích ngắn gọn, rõ ràng bằng tiếng Việt, ngôn ngữ mà automata này chấp nhận. Tập trung vào mục đích của nó.";
+            const userPrompt = `Dựa vào mô tả automata sau, hãy giải thích nó:\n\n${graphDescription}`;
+            
+            const modal = document.getElementById('gemini-modal');
+            const explanationDiv = document.getElementById('gemini-explanation');
+            
+            explanationDiv.textContent = "Đang phân tích đồ thị của bạn...";
+            modal.style.display = "block";
+            
+            const explanation = await callGemini(systemPrompt, userPrompt);
+            
+            if (explanation) {
+                explanationDiv.textContent = explanation;
+            } else {
+                explanationDiv.textContent = "Không thể tạo lời giải thích. Vui lòng thử lại.";
+            }
+        }
+        
+        /**
+         * Xử lý sự kiện "Gợi ý Test"
+         */
+        async function handleSuggestTestCases() {
+            if (!startState) {
+                showMessage("Vui lòng đặt trạng thái bắt đầu trước.", "error");
+                return;
+            }
+
+            const graphDescription = serializeGraph();
+            const systemPrompt = "Bạn là một công cụ kiểm thử automata. Chỉ trả về đối tượng JSON theo schema. Không giải thích.";
+            const userPrompt = `Tạo 5 chuỗi nên "Chấp nhận" (accept) và 5 chuỗi nên "Từ chối" (reject) cho automata sau. Chỉ sử dụng các ký tự từ bảng chữ cái đã cho. ${graphDescription}`;
+            
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    accept: {
+                        type: "ARRAY",
+                        items: { type: "STRING" }
+                    },
+                    reject: {
+                        type: "ARRAY",
+                        items: { type: "STRING" }
+                    }
+                },
+                required: ["accept", "reject"]
+            };
+
+            const jsonString = await callGemini(systemPrompt, userPrompt, schema);
+            
+            if (jsonString) {
+                try {
+                    const testCases = JSON.parse(jsonString);
+                    const container = document.getElementById('test-case-container');
+                    container.innerHTML = ''; // Xóa các gợi ý cũ
+                    
+                    const createList = (title, cases, color) => {
+                        const titleEl = document.createElement('p');
+                        titleEl.className = `font-medium text-sm mt-2 text-${color}-600`;
+                        titleEl.textContent = title;
+                        container.appendChild(titleEl);
+                        
+                        const ul = document.createElement('ul');
+                        ul.className = 'list-disc list-inside';
+                        cases.forEach(str => {
+                            const li = document.createElement('li');
+                            li.className = 'test-case-list text-gray-700 font-mono';
+                            li.textContent = str === "" ? "(chuỗi rỗng)" : str;
+                            li.onclick = () => {
+                                document.getElementById('test-string').value = str;
+                            };
+                            ul.appendChild(li);
+                        });
+                        container.appendChild(ul);
+                    };
+                    
+                    createList("Chấp nhận:", testCases.accept, "green");
+                    createList("Từ chối:", testCases.reject, "red");
+
+                } catch (e) {
+                    console.error("Lỗi parse JSON:", e);
+                    showMessage("Lỗi: Không thể đọc gợi ý từ Gemini.", "error");
+                }
+            }
+        }
+
+
+        // --- HÀM HỖ TRỢ ---
+
+        // Hàm sleep
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Hàm xóa sạch đồ thị
+        function clearGraph() {
+            cy.elements().remove();
+            stateCounter = 0;
+            startState = null;
+            finalStates.clear();
+            resetSimulation();
+            document.getElementById('test-case-container').innerHTML = ''; // Xóa gợi ý test
+        }
+
+        // Hàm vẽ đồ thị từ dữ liệu JSON
+        function drawGraphFromData(graphData) {
+            clearGraph();
+            let maxStateNum = -1;
+
+            try {
+                cy.batch(() => {
+                    // Thêm các nút (nodes)
+                    graphData.nodes.forEach(node => {
+                        cy.add({
+                            group: 'nodes',
+                            data: { id: node.id }
+                        });
+                        // Cập nhật stateCounter
+                        const match = node.id.match(/\d+/);
+                        if (match) {
+                            const num = parseInt(match[0], 10);
+                            if (num > maxStateNum) {
+                                maxStateNum = num;
+                            }
+                        }
+                    });
+
+                    // Thêm các cạnh (edges)
+                    graphData.edges.forEach(edge => {
+                        let edgeData = {
+                            source: edge.source,
+                            target: edge.target
+                        };
+
+                        if (automataType === 'TM') {
+                            edgeData.label = `${edge.read} → ${edge.write}, ${edge.move}`;
+                            edgeData.tm_read = edge.read;
+                            edgeData.tm_write = edge.write;
+                            edgeData.tm_move = edge.move;
+                        } else {
+                            edgeData.label = edge.label || '';
+                        }
+                        
+                        // Chỉ thêm cạnh nếu cả nguồn và đích đều tồn tại
+                        if (cy.getElementById(edge.source).length > 0 && cy.getElementById(edge.target).length > 0) {
+                             cy.add({
+                                group: 'edges',
+                                data: edgeData
+                            });
+                        } else {
+                            console.warn(`Bỏ qua cạnh không hợp lệ: ${edge.source} -> ${edge.target}`);
+                        }
+                    });
+                });
+
+                // Đặt trạng thái bắt đầu
+                if (graphData.startState && cy.getElementById(graphData.startState).length > 0) {
+                    startState = graphData.startState;
+                    cy.getElementById(startState).addClass('start-state');
+                } else {
+                    throw new Error("Trạng thái bắt đầu không hợp lệ.");
+                }
+
+                // Đặt các trạng thái kết thúc
+                graphData.finalStates.forEach(id => {
+                    if (cy.getElementById(id).length > 0) {
+                        finalStates.add(id);
+                        cy.getElementById(id).addClass('final-state');
+                    }
+                });
+
+                // Cập nhật stateCounter
+                stateCounter = maxStateNum + 1;
+
+                // Chạy layout
+                cy.layout({
+                    name: 'breadthfirst',
+                    directed: true,
+                    padding: 30,
+                    grid: true,
+                    spacingFactor: 1.5
+                }).run();
+
+                showMessage("Đồ thị đã được tạo bằng AI!", "success");
+
+            } catch (e) {
+                console.error("Lỗi khi vẽ đồ thị:", e);
+                showMessage("Lỗi: Dữ liệu AI trả về có thể bị hỏng.", "error");
+                clearGraph(); // Xóa đồ thị bị lỗi
+            }
+        }
+
+
+        // Hàm reset mô phỏng
+        function resetSimulation() {
+            // Xóa tất cả các lớp (class) highlight
+            cy.elements().removeClass('current-state traversed-edge');
+            
+            // Reset trạng thái bắt đầu (nếu có)
+            if (startState && cy.getElementById(startState).length > 0) {
+                // Chỉ thêm 'current-state' nếu chế độ không phải NFA (vì NFA xử lý epsilon closure)
+                if (automataType !== 'NFA') {
+                    cy.getElementById(startState).addClass('current-state');
+                } else {
+                    // NFA cần highlight bao đóng epsilon
+                    const initialClosure = getEpsilonClosure(new Set([startState]));
+                    initialClosure.forEach(id => cy.getElementById(id).addClass('current-state'));
+                }
+            }
+
+            // Đặt lại kết quả
+            const resultDisplay = document.getElementById('test-result');
+            resultDisplay.textContent = "---";
+            resultDisplay.style.color = "#333";
+
+            // Ẩn và xóa băng TM
+            const tapeContainer = document.getElementById('tm-tape-container');
+            tapeContainer.classList.add('hidden');
+            tapeContainer.innerHTML = '';
+
+            // Kích hoạt lại các nút
+            document.getElementById('run-test').disabled = false;
+            document.getElementById('automata-type').disabled = false;
+        }
+
+        // Cập nhật UI hiển thị node nguồn và đích
+        function updateSelectionUI() {
+            const sourceId = sourceNode ? sourceNode.id() : 'chưa chọn';
+            const targetId = targetNode ? targetNode.id() : 'chưa chọn';
+
+            // Cập nhật cả hai bảng
+            document.getElementById('source-node-dfa').textContent = sourceId;
+            document.getElementById('target-node-dfa').textContent = targetId;
+            document.getElementById('source-node-tm').textContent = sourceId;
+            document.getElementById('target-node-tm').textContent = targetId;
+        }
+
+        // Bỏ chọn tất cả
+        function clearSelection() {
+            cy.$(':selected').unselect();
+            sourceNode = null;
+            targetNode = null;
+            updateSelectionUI();
+        }
+
+        // Hiển thị thông báo
+        function showMessage(message, type = 'success') {
+            const msgBox = document.getElementById('message-box');
+            msgBox.textContent = message;
+            msgBox.className = `message-box ${type === 'success' ? 'message-success' : 'message-error'}`;
+            msgBox.style.display = 'block';
+
+            // Ẩn loader nếu có thông báo
+            showLoader(false);
+
+            setTimeout(() => {
+                msgBox.style.display = 'none';
+            }, 3000);
+        }
+
+        // --- HÀM LOGIC CỐT LÕI ---
+
+        // Thêm đường chuyển cho DFA/NFA
+        function addEdgeDfaNfa() {
+            const symbols = document.getElementById('edge-symbols').value.trim() || '?';
+                
+            if (!sourceNode || !targetNode) {
+                showMessage("Vui lòng chọn MỘT nguồn và MỘT đích.", "error");
+                return;
+            }
+
+            // Kiểm tra xem cạnh đã tồn tại chưa (cho cùng 1 ký tự)
+            const existingEdges = sourceNode.edgesTo(targetNode);
+            let edgeLabel = symbols;
+
+            // Tối ưu: Nếu đã có cạnh, gộp nhãn (hữu ích cho NFA)
+            let existingEdge = null;
+            if (automataType === 'NFA') {
+                // Tìm cạnh KHÔNG PHẢI TM
+                existingEdge = existingEdges.filter(e => e.data('tm_read') === undefined).find(edge => 
+                    edge.source().id() === sourceNode.id() && 
+                    edge.target().id() === targetNode.id()
+                );
+            }
+
+            if (existingEdge) {
+                const oldLabel = existingEdge.data('label');
+                const newLabels = new Set([...oldLabel.split(','), ...symbols.split(',')]);
+                edgeLabel = Array.from(newLabels).join(',');
+                existingEdge.data('label', edgeLabel);
+            } else {
+                cy.add({
+                    group: 'edges',
+                    data: {
+                        source: sourceNode.id(),
+                        target: targetNode.id(),
+                        label: edgeLabel
+                    }
+                });
+            }
+            
+            clearSelection();
+        }
+
+        // Thêm đường chuyển cho Turing Machine
+        function addEdgeTm() {
+            if (!sourceNode || !targetNode) {
+                showMessage("Vui lòng chọn MỘT nguồn và MỘT đích.", "error");
+                return;
+            }
+
+            const blankSymbol = document.getElementById('tm-blank-symbol').value || '_';
+            const read = document.getElementById('tm-read-symbol').value.trim() || blankSymbol;
+            const write = document.getElementById('tm-write-symbol').value.trim() || read; // Mặc định là viết lại ký tự đã đọc
+            const move = document.getElementById('tm-move-direction').value;
+            
+            // Định dạng nhãn: Đọc → Viết, Di chuyển
+            const label = `${read} → ${write}, ${move}`;
+
+            // Lưu trữ dữ liệu thô để mô phỏng
+            cy.add({
+                group: 'edges',
+                data: {
+                    source: sourceNode.id(),
+                    target: targetNode.id(),
+                    label: label,
+                    tm_read: read,
+                    tm_write: write,
+                    tm_move: move
+                }
+            });
+
+            clearSelection();
+        }
+
+
+        // 1. Kiểm tra tính hợp lệ
+        function validateGraph() {
+            if (automataType === 'TM') {
+                showMessage("Chức năng kiểm tra tính hợp lệ cho Máy Turing chưa được triển khai.", "error");
+                return;
+            }
+            
+            if (automataType !== 'DFA') {
+                showMessage("Chức năng kiểm tra hiện chỉ hỗ trợ DFA.", "error");
+                return;
+            }
+
+            let isValid = true;
+            let errors = [];
+
+            // Kiểm tra 1: Phải có đúng 1 trạng thái bắt đầu
+            if (!startState) {
+                isValid = false;
+                errors.push("Lỗi: Không có trạng thái bắt đầu.");
+            }
+
+            // Kiểm tra 2: Bảng chữ cái phải được định nghĩa
+            if (alphabet.size === 0) {
+                isValid = false;
+                errors.push("Lỗi: Bảng chữ cái rỗng.");
+            }
+
+            // Kiểm tra 3: Mỗi trạng thái phải có đúng 1 đường chuyển đi cho MỖI ký tự trong bảng chữ cái
+            const nodes = cy.nodes();
+            nodes.forEach(node => {
+                const outgoingSymbols = new Set();
+                let hasDuplicateTransition = false;
+
+                // Chỉ kiểm tra các cạnh không phải của TM
+                node.outgoers('edge').filter(e => e.data('tm_read') === undefined).forEach(edge => {
+                    const symbols = edge.data('label').split(',');
+                    symbols.forEach(symbol => {
+                        if (symbol === EPSILON || symbols.length > 1) {
+                            isValid = false;
+                            errors.push(`Lỗi tại ${node.id()}: DFA không được có Epsilon hoặc nhiều ký tự trên 1 cạnh.`);
+                        }
+                        if (outgoingSymbols.has(symbol)) {
+                            hasDuplicateTransition = true;
+                        }
+                        outgoingSymbols.add(symbol);
+                    });
+                });
+
+                if (hasDuplicateTransition) {
+                    isValid = false;
+                    errors.push(`Lỗi tại ${node.id()}: Có nhiều hơn 1 đường chuyển cho cùng 1 ký tự.`);
+                }
+                
+                // Kiểm tra xem tất cả ký tự yêu cầu có mặt không
+                for (const char of alphabet) {
+                    if (!outgoingSymbols.has(char)) {
+                        isValid = false;
+                        errors.push(`Lỗi tại ${node.id()}: Thiếu đường chuyển cho ký tự '${char}'.`);
+                    }
+                }
+            });
+
+            if (isValid) {
+                showMessage("Đồ thị là một DFA hợp lệ!", "success");
+            } else {
+                showMessage("DFA không hợp lệ: " + errors[0], "error"); // Chỉ hiển thị lỗi đầu tiên
+                console.error("Lỗi DFA:", errors);
+            }
+        }
+
+        // 2. Bắt đầu Mô phỏng (thay thế runTest)
+        async function startSimulation() {
+            const inputString = document.getElementById('test-string').value;
+            const resultDisplay = document.getElementById('test-result');
+            
+            if (!startState) {
+                showMessage("Không thể chạy thử: Chưa đặt trạng thái bắt đầu.", "error");
+                resultDisplay.textContent = "Lỗi";
+                resultDisplay.style.color = "#dc3545";
+                return;
+            }
+
+            // Reset
+            resetSimulation();
+            
+            // Vô hiệu hóa nút khi chạy
+            document.getElementById('run-test').disabled = true;
+            document.getElementById('automata-type').disabled = true;
+            
+            resultDisplay.textContent = "Đang chạy...";
+            resultDisplay.style.color = "#666";
+            
+            const simSpeed = parseInt(document.getElementById('sim-speed').value, 10);
+            let result = false;
+
+            try {
+                if (automataType === 'DFA') {
+                    result = await simulateDFA(inputString, simSpeed);
+                } else if (automataType === 'NFA') {
+                    result = await simulateNFA(inputString, simSpeed);
+                } else if (automataType === 'TM') {
+                    document.getElementById('tm-tape-container').classList.remove('hidden');
+                    result = await simulateTM(inputString, simSpeed);
+                }
+            } catch (error) {
+                console.error("Simulation error:", error);
+                showMessage(error.message, "error");
+                result = false;
+            }
+
+            // Kích hoạt lại nút
+            document.getElementById('run-test').disabled = false;
+            document.getElementById('automata-type').disabled = false;
+            
+            // Hiển thị kết quả cuối cùng
+            if (result) {
+                resultDisplay.textContent = "Chấp nhận";
+                resultDisplay.style.color = "#28a745";
+            } else {
+                resultDisplay.textContent = "Từ chối";
+                resultDisplay.style.color = "#dc3545";
+            }
+
+            // Bỏ highlight trạng thái cuối cùng
+            setTimeout(() => {
+                 cy.$('.current-state').removeClass('current-state');
+            }, 2000);
+        }
+
+        // 2a. Logic mô phỏng DFA (async)
+        async function simulateDFA(inputString, speed) {
+            let currentState = cy.getElementById(startState);
+            currentState.addClass('current-state');
+            await sleep(speed);
+
+            for (const char of inputString) {
+                if (!alphabet.has(char) && char.length > 0) { // Cho phép chuỗi rỗng
+                    throw new Error(`Ký tự '${char}' không có trong bảng chữ cái.`);
+                }
+
+                let nextState = null;
+                let traversedEdge = null;
+                const outgoingEdges = currentState.outgoers('edge').filter(e => e.data('tm_read') === undefined);
+                
+                for (let i = 0; i < outgoingEdges.length; i++) {
+                    const edge = outgoingEdges[i];
+                    if (edge.data('label') === char) {
+                        nextState = edge.target();
+                        traversedEdge = edge;
+                        break;
+                    }
+                }
+
+                if (nextState) {
+                    // Highlight
+                    currentState.removeClass('current-state');
+                    if (traversedEdge) traversedEdge.addClass('traversed-edge');
+                    
+                    await sleep(speed / 2); // Chờ 1 nửa để thấy cạnh
+
+                    if (traversedEdge) traversedEdge.removeClass('traversed-edge');
+                    currentState = nextState;
+                    currentState.addClass('current-state');
+                    
+                    await sleep(speed / 2); // Chờ 1 nửa để thấy nút
+                } else {
+                    // Không có đường chuyển -> bị kẹt -> từ chối
+                    currentState.removeClass('current-state');
+                    throw new Error(`DFA bị kẹt! Không có đường chuyển cho '${char}' tại ${currentState.id()}`);
+                }
+            }
+
+            // Kết thúc chuỗi, kiểm tra xem có ở trạng thái kết thúc không
+            const isAccepted = finalStates.has(currentState.id());
+            if (!isAccepted) {
+                 setTimeout(() => currentState.removeClass('current-state'), 1000);
+            }
+            return isAccepted;
+        }
+
+        // 2b. Logic mô phỏng NFA (async)
+        async function simulateNFA(inputString, speed) {
+            // Bắt đầu với trạng thái bắt đầu và bao đóng epsilon của nó
+            let currentStates = getEpsilonClosure(new Set([startState]));
+            
+            // Highlight các trạng thái epsilon ban đầu
+            cy.elements().removeClass('current-state');
+            currentStates.forEach(id => cy.getElementById(id).addClass('current-state'));
+            await sleep(speed);
+
+            for (const char of inputString) {
+                if (!alphabet.has(char) && char.length > 0) { // Cho phép chuỗi rỗng
+                     throw new Error(`Ký tự '${char}' không có trong bảng chữ cái.`);
+                }
+
+                let nextStates = new Set();
+                
+                // 1. Tìm tất cả các trạng thái có thể đến được bằng ký tự 'char'
+                currentStates.forEach(nodeId => {
+                    const node = cy.getElementById(nodeId);
+                    node.outgoers('edge').filter(e => e.data('tm_read') === undefined).forEach(edge => {
+                        const symbols = edge.data('label').split(',');
+                        if (symbols.includes(char)) {
+                            nextStates.add(edge.target().id());
+                            edge.addClass('traversed-edge'); // Highlight cạnh được dùng
+                        }
+                    });
+                });
+
+                await sleep(speed / 2); // Cho thấy các cạnh
+
+                // 2. Lấy bao đóng epsilon của các trạng thái mới
+                let epsilonStates = getEpsilonClosure(nextStates);
+
+                // 3. Cập nhật UI
+                cy.elements().removeClass('current-state traversed-edge');
+                epsilonStates.forEach(id => cy.getElementById(id).addClass('current-state'));
+                
+                await sleep(speed / 2); // Cho thấy các nút mới
+
+                currentStates = epsilonStates;
+
+                if (currentStates.size === 0) {
+                    return false; // Không có đường đi nào, bị kẹt -> từ chối
+                }
+            }
+
+            // 3. Sau khi hết chuỗi, kiểm tra xem CÓ BẤT KỲ trạng thái nào là trạng thái kết thúc không
+            let accepted = false;
+            for (const stateId of currentStates) {
+                if (finalStates.has(stateId)) {
+                    accepted = true;
+                }
+            }
+            if (!accepted) {
+                 setTimeout(() => cy.elements().removeClass('current-state'), 1000);
+            }
+            return accepted;
+        }
+
+        // 2c. Hàm hỗ trợ NFA: Lấy bao đóng Epsilon
+        function getEpsilonClosure(states) {
+            let closure = new Set(states);
+            let stack = [...states];
+
+            while (stack.length > 0) {
+                const nodeId = stack.pop();
+                if (!nodeId) continue;
+                const node = cy.getElementById(nodeId);
+                
+                node.outgoers('edge').filter(e => e.data('tm_read') === undefined).forEach(edge => {
+                    const symbols = edge.data('label').split(',');
+                    if (symbols.includes(EPSILON)) {
+                        const targetId = edge.target().id();
+                        if (!closure.has(targetId)) {
+                            closure.add(targetId);
+                            stack.push(targetId);
+                        }
+                    }
+                });
+            }
+            return closure;
+        }
+
+        // 2d. Logic mô phỏng Turing Machine (async)
+        async function simulateTM(inputString, speed) {
+            const blankSymbol = document.getElementById('tm-blank-symbol').value.trim() || '_';
+            const stepLimit = 1000;
+            
+            let tape = {};
+            inputString.split('').forEach((char, i) => {
+                if (char.trim().length > 0) {
+                    tape[i] = char;
+                }
+            });
+
+            let head = 0;
+            let currentState = cy.getElementById(startState);
+            
+            // Hàm render băng
+            const renderTape = (currentHead) => {
+                const tapeContainer = document.getElementById('tm-tape-container');
+                tapeContainer.innerHTML = '';
+                
+                // Tìm vị trí min/max của băng
+                const keys = Object.keys(tape).map(Number);
+                if (keys.length === 0) keys.push(0); // Đảm bảo băng không rỗng
+
+                const min = Math.min(Math.min(...keys, currentHead) - 5, -5); // Hiển thị 5 ô trống
+                const max = Math.max(Math.max(...keys, currentHead) + 5, 5); // Hiển thị 5 ô trống
+
+                for (let i = min; i <= max; i++) {
+                    const cell = document.createElement('span');
+                    cell.className = 'tape-cell';
+                    cell.textContent = tape[i] || blankSymbol;
+                    if (i === currentHead) {
+                        cell.classList.add('tape-head');
+                    }
+                    tapeContainer.appendChild(cell);
+                }
+                // Tự cuộn đến đầu đọc
+                const headElement = tapeContainer.querySelector('.tape-head');
+                if (headElement) {
+                    headElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
+            };
+
+            for (let step = 0; step < stepLimit; step++) {
+                // Highlight trạng thái và render băng
+                cy.elements().removeClass('current-state traversed-edge');
+                currentState.addClass('current-state');
+                renderTape(head);
+                await sleep(speed);
+
+                // 1. Kiểm tra trạng thái chấp nhận
+                if (finalStates.has(currentState.id())) {
+                    return true; // Chấp nhận
+                }
+
+                // 2. Đọc ký tự
+                const readSymbol = tape[head] || blankSymbol;
+
+                // 3. Tìm đường chuyển
+                const outgoingEdges = currentState.outgoers('edge').filter(e => e.data('tm_read') !== undefined);
+                let foundEdge = null;
+                for (let i = 0; i < outgoingEdges.length; i++) {
+                    const edge = outgoingEdges[i];
+                    if (edge.data('tm_read') === readSymbol) {
+                        foundEdge = edge;
+                        break;
+                    }
+                }
+
+                // 4. Nếu kẹt
+                if (!foundEdge) {
+                    throw new Error(`Máy Turing bị kẹt! Không có đường chuyển cho '${readSymbol}' tại ${currentState.id()}`);
+                }
+
+                // 5. Thực hiện đường chuyển
+                foundEdge.addClass('traversed-edge');
+                await sleep(speed / 2); // Chờ để thấy cạnh
+
+                // Viết
+                const writeSymbol = foundEdge.data('tm_write');
+                if (writeSymbol === blankSymbol) {
+                    delete tape[head]; // Xóa khỏi băng nếu viết ký tự trống
+                } else {
+                    tape[head] = writeSymbol;
+                }
+                
+                // Cập nhật tape UI (chỉ ô hiện tại)
+                renderTape(head); 
+                
+                // Di chuyển
+                if (foundEdge.data('tm_move') === 'R') {
+                    head++;
+                } else { // 'L'
+                    head--;
+                }
+                
+                // Cập nhật trạng thái
+                currentState = foundEdge.target();
+                
+                // Render lại băng với đầu đọc ở vị trí mới
+                renderTape(head);
+                await sleep(speed / 2);
+            }
+
+            // Đạt giới hạn
+            throw new Error("Đã đạt giới hạn bước. Giả định lặp vô hạn.");
+        }
+
+    </script>
+</body>
+</html>
