@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Automata Nâng cao (AI Powered)</title>
+    <title>Công cụ học Automata (với AI)</title>
     <!-- Tải Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tải Cytoscape.js -->
+    <!-- Tải Cytoscape.js (thư viện vẽ đồ thị) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <!-- Tải layout extension (ví dụ: breadthfirst) -->
+    <script src="https://unpkg.com/cytoscape-breadthfirst@2.0.1/cytoscape-breadthfirst.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -17,16 +19,18 @@
             border: 1px solid #e2e8f0; border-radius: 0.5rem;
             background-color: #fdfdfd;
         }
+        /* Toast Message */
         .message-box {
             display: none; position: fixed; top: 20px; left: 50%;
             transform: translateX(-50%); padding: 1rem 1.5rem;
             border-radius: 0.5rem; color: white; font-weight: 500;
-            z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
         }
         .message-success { background-color: #28a745; }
         .message-error { background-color: #dc3545; }
 
-        /* Styles for Simulation */
+        /* Simulation Styles */
         .current-state {
             background-color: #fde047; border-color: #facc15; border-width: 4px;
             transition: all 0.2s ease-in-out;
@@ -40,8 +44,9 @@
         #tm-tape-container {
             font-family: 'Courier New', Courier, monospace; font-size: 1.1rem;
             text-align: center; overflow-x: auto; white-space: nowrap;
-            padding: 10px 5px; background-color: #f3f4f6; border: 1px solid #d1d5db;
-            border-radius: 0.375rem; margin-top: 1rem; min-height: 50px;
+            padding: 10px 5px; background-color: #f3f4f6;
+            border: 1px solid #d1d5db; border-radius: 0.375rem;
+            margin-top: 1rem; min-height: 50px;
         }
         .tape-cell {
             display: inline-block; width: 28px; height: 28px; line-height: 28px;
@@ -55,13 +60,13 @@
 
         /* Modal */
         .modal {
-            display: none; position: fixed; z-index: 999; left: 0; top: 0;
+            display: none; position: fixed; z-index: 100; left: 0; top: 0;
             width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);
         }
         .modal-content {
-            background-color: #fefefe; margin: 5% auto; padding: 24px;
-            border: 1px solid #888; border-radius: 0.5rem; width: 80%; max-width: 700px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3); position: relative;
+            background-color: #fefefe; margin: 10% auto; padding: 24px;
+            border: 1px solid #888; border-radius: 0.5rem; width: 80%;
+            max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
         .modal-close {
             color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;
@@ -76,37 +81,45 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Parse Tree Nodes */
+        /* Test Cases */
+        .test-case-list {
+            font-size: 0.875rem; cursor: pointer; padding: 4px 8px;
+            border-radius: 4px; transition: background-color 0.2s;
+        }
+        .test-case-list:hover { background-color: #e5e7eb; }
+
+        /* CFG Tree Styles */
         .parse-tree-non-terminal {
             background-color: #fff; border-color: #3b82f6; border-width: 2px;
-            shape: rectangle; text-valign: center; text-halign: center;
+            shape: rectangle; width: label; height: 30px; padding: 6px;
         }
         .parse-tree-terminal {
             background-color: #f3f4f6; border-width: 0; shape: ellipse;
-            text-valign: center; text-halign: center;
+            width: 30px; height: 30px;
+        }
+        .parse-tree-epsilon {
+            background-color: #fff; border-width: 0; font-style: italic; color: #6b7280;
         }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
 
-    <!-- Header -->
-    <header class="bg-white shadow-md w-full z-10">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-blue-600">Automata & Regex Tool (AI Powered)</h1>
-            <div class="text-sm text-gray-500">Powered by Gemini 1.5 Flash</div>
+    <header class="bg-white shadow-md w-full">
+        <div class="container mx-auto px-4 py-3">
+            <h1 class="text-2xl font-bold text-blue-600">Công cụ học Automata (với Gemini AI)</h1>
         </div>
     </header>
 
-    <!-- Main Content -->
     <div class="flex-grow flex flex-col md:flex-row p-4 gap-4" style="height: calc(100vh - 60px);">
 
-        <!-- LEFT PANEL: Controls -->
-        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto flex flex-col gap-4">
-            
-            <!-- 1. Mode Selection -->
-            <div>
-                <label class="block text-sm font-medium mb-1">Loại Automata:</label>
-                <select id="automata-type" class="w-full p-2 border rounded bg-gray-50">
+        <!-- Control Panel -->
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Bảng điều khiển</h2>
+
+            <!-- Automata Type -->
+            <div class="mb-4">
+                <label for="automata-type" class="block text-sm font-medium mb-1">Loại Automata:</label>
+                <select id="automata-type" class="w-full p-2 border rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
                     <option value="DFA">DFA (Đơn định)</option>
                     <option value="NFA">NFA (Không đơn định)</option>
                     <option value="TM">Turing Machine</option>
@@ -114,131 +127,157 @@
                 </select>
             </div>
 
-            <!-- 2. Regular Expression Tools (NEW) -->
-            <fieldset class="border rounded p-3 border-indigo-200 bg-indigo-50">
-                <legend class="text-sm font-bold text-indigo-700 px-1">Công cụ Chuyển đổi & Tối ưu</legend>
-                
-                <label class="block text-xs font-medium mb-1">Regular Expression:</label>
-                <input type="text" id="regex-input" class="w-full p-2 border rounded mb-2 text-sm" placeholder="(ab|c)*d">
-                
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                    <button id="btn-regex-nfa" class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded">Regex &#8594; NFA</button>
-                    <button id="btn-regex-dfa" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1 px-2 rounded">Regex &#8594; DFA</button>
-                </div>
-                
-                <button id="btn-graph-regex" class="w-full bg-white border border-indigo-500 text-indigo-700 hover:bg-indigo-100 text-xs py-1 px-2 rounded mb-3">Đồ thị hiện tại &#8594; Regex</button>
-
-                <hr class="border-indigo-200 mb-2">
-
-                <button id="btn-nfa-dfa" class="w-full bg-purple-500 hover:bg-purple-600 text-white text-xs py-1 px-2 rounded mb-2">NFA hiện tại &#8594; DFA</button>
-                <button id="btn-minimize-dfa" class="w-full bg-pink-500 hover:bg-pink-600 text-white text-xs py-1 px-2 rounded">Tối thiểu hóa (Minimize) DFA</button>
-            </fieldset>
-
-            <!-- 3. Graph Construction (Manual & AI) -->
-            <fieldset class="border rounded p-3">
-                <legend class="text-sm font-semibold px-1">Tạo Đồ thị</legend>
-                <textarea id="gemini-prompt" rows="2" class="w-full p-2 border rounded mb-2 text-sm" placeholder="VD: DFA chấp nhận chuỗi chẵn số 0"></textarea>
-                <button id="generate-graph" class="w-full bg-teal-500 hover:bg-teal-600 text-white py-1 px-2 rounded mb-3 text-sm">✨ Tạo bằng AI</button>
-
-                <!-- Manual Controls -->
-                <div id="manual-controls">
-                    <div class="grid grid-cols-3 gap-1 mb-2">
-                        <button id="add-state" class="bg-gray-200 hover:bg-gray-300 text-xs py-1 rounded">Thêm Nút</button>
-                        <button id="set-start" class="bg-green-100 hover:bg-green-200 text-green-800 text-xs py-1 rounded">Set Start</button>
-                        <button id="set-final" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 text-xs py-1 rounded">Set Final</button>
-                    </div>
-                    
-                    <div id="edge-controls">
-                        <input type="text" id="edge-symbols" class="w-full p-1 border rounded mb-1 text-sm" placeholder="Nhập ký tự (vd: a,b)">
-                        <button id="add-edge-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white text-xs py-1 rounded">Nối Nút (Chọn 2 nút)</button>
-                        <div class="text-xs text-gray-500 mt-1">
-                            Nguồn: <span id="src-node" class="font-bold">-</span> &rarr; Đích: <span id="tgt-node" class="font-bold">-</span>
-                        </div>
-                    </div>
-                    
-                    <!-- TM Specific Controls -->
-                    <div id="tm-controls" class="hidden mt-2">
-                        <input type="text" id="tm-read" class="w-full p-1 border rounded mb-1 text-xs" placeholder="Đọc">
-                        <input type="text" id="tm-write" class="w-full p-1 border rounded mb-1 text-xs" placeholder="Viết">
-                        <select id="tm-move" class="w-full p-1 border rounded mb-1 text-xs">
-                            <option value="R">Phải (R)</option>
-                            <option value="L">Trái (L)</option>
-                        </select>
-                        <button id="add-edge-tm" class="w-full bg-gray-600 hover:bg-gray-700 text-white text-xs py-1 rounded">Thêm Cạnh TM</button>
-                    </div>
-
-                    <!-- CFG Controls -->
-                    <div id="cfg-controls" class="hidden mt-2">
-                        <textarea id="cfg-rules-input" rows="5" class="w-full p-2 border rounded text-xs font-mono" placeholder="S -> aSb | e"></textarea>
-                    </div>
-
-                    <button id="delete-selected" class="w-full bg-red-500 text-white text-xs py-1 rounded mt-2">Xóa Đang Chọn</button>
-                </div>
-            </fieldset>
-
-            <!-- Config -->
-            <div class="mt-auto">
-                <label class="block text-xs font-medium mb-1">Bảng chữ cái:</label>
-                <input type="text" id="alphabet-input" value="a,b" class="w-full p-1 border rounded text-sm">
+            <!-- Alphabet -->
+            <div id="alphabet-controls" class="mb-4">
+                <label for="alphabet-input" class="block text-sm font-medium mb-1">Bảng chữ cái (cách nhau bằng dấu phẩy):</label>
+                <input type="text" id="alphabet-input" value="a,b" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="a,b">
             </div>
 
-        </div>
+            <!-- TM Blank Symbol -->
+            <div id="tm-blank-symbol-div" class="mb-4 hidden">
+                <label for="tm-blank-symbol" class="block text-sm font-medium mb-1">Ký tự trống (Blank Symbol):</label>
+                <input type="text" id="tm-blank-symbol" value="_" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="_, B, v.v.">
+            </div>
 
-        <!-- CENTER PANEL: Visualization -->
-        <div class="w-full md:w-2/4 lg:w-3/5 h-full bg-white rounded-lg shadow-lg relative">
-            <div id="cy"></div>
-            <div id="gemini-loader" class="loader absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50"></div>
-        </div>
-
-        <!-- RIGHT PANEL: Testing & Analysis -->
-        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
-            <h2 class="text-md font-semibold mb-3 border-b pb-1">Kiểm thử & Phân tích</h2>
-
-            <button id="explain-automata" class="w-full bg-purple-500 hover:bg-purple-600 text-white text-xs py-2 rounded mb-2">✨ Giải thích Đồ thị này</button>
-            
-            <fieldset class="border rounded p-2 mb-3">
-                <legend class="text-xs font-semibold px-1">Mô phỏng</legend>
-                <input type="text" id="test-string" class="w-full p-2 border rounded mb-2 text-sm" placeholder="Chuỗi nhập (vd: abba)">
-                <div class="flex gap-1 mb-2">
-                    <select id="sim-speed" class="w-1/2 p-1 border rounded text-xs">
-                        <option value="200">Nhanh</option>
-                        <option value="500" selected>Vừa</option>
-                        <option value="1000">Chậm</option>
-                    </select>
-                    <button id="run-test" class="w-1/2 bg-blue-500 text-white text-xs rounded">Chạy</button>
+            <!-- CONVERSION & REGEX TOOLS -->
+            <fieldset id="conversion-controls" class="border rounded-md p-3 mb-4 bg-indigo-50 border-indigo-200 hidden">
+                <legend class="text-md font-semibold px-2 text-indigo-700">Chuyển đổi & Regex (AI)</legend>
+                <label class="block text-xs font-medium mb-1 text-gray-600">Regex Input:</label>
+                <input type="text" id="regex-input" class="w-full p-2 border rounded-md mb-2 text-sm" placeholder="(a|b)*abb">
+                <div class="flex gap-1 mb-3">
+                    <button id="regex-to-nfa" class="w-1/2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded font-medium transition">Regex &#8594; NFA</button>
+                    <button id="regex-to-dfa" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1 px-2 rounded font-medium transition">Regex &#8594; DFA</button>
                 </div>
-                <div class="text-center p-2 bg-gray-100 rounded">
-                    <span id="test-result" class="font-bold text-lg text-gray-400">---</span>
-                </div>
-                <div id="tm-tape-container" class="hidden text-xs"></div>
+                <button id="automata-to-regex" class="w-full bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Đồ thị hiện tại &#8594; Regex</button>
+                <div id="regex-output" class="p-2 bg-white border border-gray-300 rounded text-sm font-mono hidden mb-3 break-all text-gray-800 select-all"></div>
+                <button id="nfa-to-dfa" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 px-4 rounded-md transition duration-150 hidden">NFA hiện tại &#8594; DFA</button>
             </fieldset>
 
-            <button id="suggest-test-cases" class="w-full bg-cyan-600 text-white text-xs py-2 rounded mb-2">✨ Gợi ý Test Case</button>
-            <div id="test-case-list" class="text-xs space-y-1"></div>
+            <!-- AI Generation -->
+            <fieldset class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">✨ Tạo (AI)</legend>
+                <label for="gemini-prompt" class="block text-sm font-medium mb-1">Nhập yêu cầu của bạn:</label>
+                <textarea id="gemini-prompt" rows="3" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ví dụ: DFA chấp nhận chuỗi kết thúc bằng 'a'"></textarea>
+                <button id="generate-graph" class="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150">Tạo</button>
+            </fieldset>
 
-            <div id="cfg-actions" class="hidden">
-                <button id="generate-parse-trees" class="w-full bg-green-600 text-white text-xs py-2 rounded mt-2">✨ Sinh cây phân giải</button>
+            <!-- Manual State Controls -->
+            <fieldset id="manual-state-controls" class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Trạng thái (Thủ công)</legend>
+                <button id="add-state" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Thêm Trạng thái</button>
+                <button id="set-start" class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Đặt làm Bắt đầu</button>
+                <button id="set-final" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-medium py-2 px-4 rounded-md transition duration-150">Chuyển đổi Kết thúc</button>
+            </fieldset>
+
+            <!-- DFA/NFA Edge Controls -->
+            <fieldset id="dfa-nfa-edge-controls" class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Đường chuyển (DFA/NFA)</legend>
+                <div class="text-sm mb-2">
+                    <p>Nguồn: <span id="source-node-dfa" class="font-mono text-blue-700">chưa chọn</span></p>
+                    <p>Đích: <span id="target-node-dfa" class="font-mono text-blue-700">chưa chọn</span></p>
+                </div>
+                <label for="edge-symbols" class="block text-sm font-medium mb-1">Ký tự (cho NFA: a,b; epsilon: e):</label>
+                <input type="text" id="edge-symbols" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="a">
+                <button id="add-edge-dfa-nfa" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-md transition duration-150">Thêm Đường chuyển</button>
+            </fieldset>
+
+            <!-- TM Edge Controls -->
+            <fieldset id="tm-edge-controls" class="border rounded-md p-3 mb-4 hidden">
+                <legend class="text-md font-semibold px-2">Đường chuyển (Turing Machine)</legend>
+                <div class="text-sm mb-2">
+                    <p>Nguồn: <span id="source-node-tm" class="font-mono text-blue-700">chưa chọn</span></p>
+                    <p>Đích: <span id="target-node-tm" class="font-mono text-blue-700">chưa chọn</span></p>
+                </div>
+                <label for="tm-read-symbol" class="block text-sm font-medium mb-1">Đọc (Read):</label>
+                <input type="text" id="tm-read-symbol" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="a (hoặc ký tự trống)">
+                <label for="tm-write-symbol" class="block text-sm font-medium mb-1">Viết (Write):</label>
+                <input type="text" id="tm-write-symbol" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="b (hoặc ký tự trống)">
+                <label for="tm-move-direction" class="block text-sm font-medium mb-1">Di chuyển (Move):</label>
+                <select id="tm-move-direction" class="w-full p-2 border rounded-md mb-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="R">Phải (R)</option>
+                    <option value="L">Trái (L)</option>
+                </select>
+                <button id="add-edge-tm" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-md transition duration-150">Thêm Đường chuyển</button>
+            </fieldset>
+
+            <!-- CFG Controls -->
+            <fieldset id="cfg-controls" class="border rounded-md p-3 mb-4 hidden">
+                <legend class="text-md font-semibold px-2">Quy tắc CFG</legend>
+                <label for="cfg-rules-input" class="block text-sm font-medium mb-1">Quy tắc (mỗi dòng 1 quy tắc):</label>
+                <textarea id="cfg-rules-input" rows="10" class="w-full p-2 border rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="S -> aSb | e&#10;S -> ..."></textarea>
+            </fieldset>
+
+            <!-- Other Controls -->
+            <fieldset id="other-controls" class="border rounded-md p-3 mb-4">
+                <legend class="text-md font-semibold px-2">Khác</legend>
+                <button id="delete-selected" class="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Xóa (Đã chọn)</button>
+                <button id="clear-selection" class="w-full bg-gray-400 hover:bg-gray-500 text-black font-medium py-2 px-4 rounded-md transition duration-150">Bỏ chọn</button>
+            </fieldset>
+        </div>
+
+        <!-- Visualization Area -->
+        <div class="w-full md:w-3/4 lg:w-4/5 h-full flex flex-col bg-white rounded-lg shadow-lg">
+            <div id="cy" class="flex-grow"></div>
+        </div>
+
+        <!-- Test & Analyze Panel -->
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
+            <div id="gemini-loader" class="loader mb-4"></div>
+            
+            <!-- Automata AI Panel -->
+            <div id="finite-automata-ai-panel" class="mb-4">
+                <h2 class="text-lg font-semibold mb-4 border-b pb-2">Kiểm tra Automata</h2>
+                <button id="explain-automata" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">✨ Giải thích Automata này</button>
+                <button id="validate-graph" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-md transition duration-150">Kiểm tra tính hợp lệ (DFA)</button>
+            </div>
+
+            <!-- Test String Panel -->
+            <fieldset id="finite-automata-run-panel" class="border rounded-md p-3">
+                <legend class="text-md font-semibold px-2">Thực thi chuỗi</legend>
+                <label for="test-string" class="block text-sm font-medium mb-1">Chuỗi đầu vào:</label>
+                <input type="text" id="test-string" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="abba">
+                <label for="sim-speed" class="block text-sm font-medium mb-1">Tốc độ (ms/bước):</label>
+                <select id="sim-speed" class="w-full p-2 border rounded-md mb-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="200">Rất nhanh (200ms)</option>
+                    <option value="500">Nhanh (500ms)</option>
+                    <option value="1000">Trung bình (1000ms)</option>
+                    <option value="2000">Chậm (2000ms)</option>
+                </select>
+                <div class="flex gap-2">
+                    <button id="run-test" class="w-1/2 bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 px-4 rounded-md transition duration-150">Mô phỏng</button>
+                    <button id="reset-sim" class="w-1/2 bg-gray-400 hover:bg-gray-500 text-black font-medium py-2 px-4 rounded-md transition duration-150">Reset</button>
+                </div>
+                <div class="mt-2 p-3 bg-gray-100 rounded-md text-center">
+                    <p class="text-sm font-medium">Kết quả:</p>
+                    <p id="test-result" class="text-lg font-bold">---</p>
+                </div>
+                <div id="tm-tape-container" class="hidden"></div>
+                <button id="suggest-test-cases" class="w-full bg-gradient-to-r from-sky-500 to-cyan-600 hover:from-sky-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mt-4">✨ Gợi ý Test</button>
+                <div id="test-case-container" class="mt-2"></div>
+            </fieldset>
+
+            <!-- CFG Parse Panel -->
+            <div id="cfg-parse-panel" class="hidden">
+                <h2 class="text-lg font-semibold mb-4 border-b pb-2">Phân tích CFG (AI)</h2>
+                <button id="explain-cfg" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-3">✨ Giải thích CFG này</button>
+                <button id="cfg-to-language" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-3">✨ Suy ra ngôn ngữ L (AI)</button>
+                <p class="text-sm text-gray-600 mb-2">Sử dụng các quy tắc CFG ở bảng bên trái.</p>
+                <button id="generate-parse-trees" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mt-4">✨ Sinh chuỗi & Cây phân giải</button>
+                <div id="cfg-test-case-container" class="mt-2"></div>
             </div>
         </div>
     </div>
 
-    <!-- Message Toast -->
     <div id="message-box" class="message-box"></div>
-
-    <!-- Explanation Modal -->
     <div id="gemini-modal" class="modal">
         <div class="modal-content">
             <span id="modal-close" class="modal-close">&times;</span>
-            <h3 class="text-xl font-semibold mb-3 text-purple-700">✨ Phân tích từ AI</h3>
-            <div id="gemini-explanation" class="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed"></div>
+            <h3 class="text-xl font-semibold mb-3">✨ Giải thích từ Gemini</h3>
+            <div id="gemini-explanation" class="text-gray-700 whitespace-pre-wrap">Đang tải...</div>
         </div>
     </div>
 
     <script type="module">
-        // --- CẤU HÌNH API (QUAN TRỌNG: Thay bằng Key của bạn) ---
-        const apiKey = "AIzaSyAz4DEdxOvezX_FBaodD8I3XnKvTf3Vk0Q"; 
-        const modelName = "gemini-2.5-flash-preview-09-2025";
-
         // --- BIẾN TOÀN CỤC ---
         let cy;
         let stateCounter = 0;
@@ -246,630 +285,653 @@
         let finalStates = new Set();
         let automataType = 'DFA';
         let alphabet = new Set(['a', 'b']);
+        let parseTreeData = {};
         let sourceNode = null;
         let targetNode = null;
-        const EPSILON = 'e';
+        const EPSILON = 'e'; 
 
-        // --- KHỞI TẠO ---
-        document.addEventListener('DOMContentLoaded', function() {
-            initCytoscape();
-            setupEventListeners();
-            updateUIForType(); // Init UI state
-        });
+        // --- CÁC HÀM CƠ BẢN (Được đưa lên đầu để tránh lỗi ReferenceError) ---
+        function showLoader(isLoading) { document.getElementById('gemini-loader').style.display = isLoading ? 'block' : 'none'; }
+        function showMessage(msg, type='success') {
+            const box = document.getElementById('message-box');
+            box.textContent = msg;
+            box.className = `message-box ${type==='error'?'message-error':'message-success'}`;
+            box.style.display = 'block';
+            showLoader(false);
+            setTimeout(()=>box.style.display='none', 3000);
+        }
+        function cleanJsonString(str) { if (!str) return ""; return str.replace(/```json/g, '').replace(/```/g, '').trim(); }
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        function initCytoscape() {
-            cy = cytoscape({
-                container: document.getElementById('cy'),
-                style: [
-                    { selector: 'node', style: { 'label': 'data(label)', 'text-valign': 'center', 'background-color': '#fff', 'border-color': '#666', 'border-width': 2, 'width': 40, 'height': 40 } },
-                    { selector: 'edge', style: { 'width': 2, 'line-color': '#666', 'target-arrow-color': '#666', 'target-arrow-shape': 'triangle', 'label': 'data(label)', 'font-size': 11, 'text-background-opacity': 1, 'text-background-color': '#fff', 'curve-style': 'bezier', 'control-point-step-size': 40 } },
-                    { selector: '.start-state', style: { 'border-color': '#28a745', 'border-width': 4, 'background-color': '#e6ffed' } },
-                    { selector: '.final-state', style: { 'border-color': '#333', 'border-width': 4, 'border-style': 'double' } },
-                    { selector: ':selected', style: { 'background-color': '#a0deff', 'border-color': '#007bff' } },
-                    { selector: '.current-state', style: { 'background-color': '#fde047', 'border-color': '#facc15' } },
-                    { selector: '.traversed-edge', style: { 'line-color': '#2563eb', 'target-arrow-color': '#2563eb', 'width': 4 } },
-                    // CFG Styles
-                    { selector: '.parse-tree-non-terminal', style: { 'shape': 'rectangle', 'width': 'label', 'padding': 10, 'background-color': '#fff', 'border-color': '#3b82f6' } },
-                    { selector: '.parse-tree-terminal', style: { 'shape': 'ellipse', 'background-color': '#f3f4f6', 'border-width': 0 } }
-                ],
-                layout: { name: 'grid' }
+        function updateVisibility() {
+            const ids = [
+                'dfa-nfa-edge-controls', 'tm-edge-controls', 'tm-blank-symbol-div', 
+                'manual-state-controls', 'other-controls', 'alphabet-controls', 
+                'cfg-controls', 'cfg-parse-panel', 'finite-automata-ai-panel', 
+                'finite-automata-run-panel', 'cy', 'conversion-controls', 'nfa-to-dfa'
+            ];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
             });
 
-            // Node Selection Logic
-            cy.on('tap', 'node', (evt) => {
-                if (automataType === 'CFG') return;
-                const node = evt.target;
-                if (!sourceNode) {
-                    sourceNode = node; node.select();
-                } else if (!targetNode) {
-                    targetNode = node; node.select();
+            if (automataType === 'CFG') {
+                ['cfg-controls', 'cfg-parse-panel', 'cy'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+                document.getElementById('gemini-prompt').placeholder = "Ví dụ: L = {a^n b^n | n >= 0}";
+                document.getElementById('generate-graph').textContent = "Tạo Ngữ pháp";
+            } else {
+                ['manual-state-controls', 'other-controls', 'finite-automata-ai-panel', 'finite-automata-run-panel', 'cy', 'alphabet-controls', 'conversion-controls'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+                document.getElementById('gemini-prompt').placeholder = "Ví dụ: DFA chấp nhận chuỗi kết thúc bằng 'a'";
+                document.getElementById('generate-graph').textContent = "Tạo Đồ thị";
+                
+                if (automataType === 'TM') {
+                    ['tm-edge-controls', 'tm-blank-symbol-div'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+                    document.getElementById('conversion-controls').classList.add('hidden'); 
                 } else {
-                    clearSelection(); sourceNode = node; node.select();
+                    document.getElementById('dfa-nfa-edge-controls').classList.remove('hidden');
                 }
-                updateSelectionLabel();
-            });
 
-            cy.on('tap', (evt) => {
-                if (evt.target === cy) clearSelection();
-            });
-            
-            // Right click to add node
-            cy.on('cxttap', (evt) => {
-                if (automataType === 'CFG') return;
-                if (evt.target === cy) {
-                    addNodeAt(evt.position);
+                if (automataType === 'NFA') {
+                    document.getElementById('nfa-to-dfa').classList.remove('hidden');
                 }
-            });
+            }
         }
 
-        // --- XỬ LÝ SỰ KIỆN ---
-        function setupEventListeners() {
-            // Loại Automata
-            document.getElementById('automata-type').addEventListener('change', (e) => {
-                automataType = e.target.value;
-                updateUIForType();
-                clearGraph();
-                showMessage(`Đã chuyển sang chế độ ${automataType}`);
-            });
-
-            // Các nút vẽ đồ thị thủ công
-            document.getElementById('add-state').addEventListener('click', () => addNodeAt());
-            document.getElementById('set-start').addEventListener('click', setStartState);
-            document.getElementById('set-final').addEventListener('click', toggleFinalState);
-            document.getElementById('delete-selected').addEventListener('click', deleteSelected);
-            document.getElementById('add-edge-btn').addEventListener('click', addEdgeStandard);
-            document.getElementById('add-edge-tm').addEventListener('click', addEdgeTM);
+        function resetSimulation() {
+            if (cy) cy.elements().removeClass('current-state traversed-edge');
             
-            // Chạy mô phỏng
-            document.getElementById('run-test').addEventListener('click', startSimulation);
-            
-            // AI Generators
-            document.getElementById('generate-graph').addEventListener('click', handleGenerateGraph);
-            document.getElementById('explain-automata').addEventListener('click', handleExplain);
-            document.getElementById('suggest-test-cases').addEventListener('click', handleSuggestTests);
-            
-            // --- CÁC TÍNH NĂNG MỚI (REGEX / CONVERSION) ---
-            document.getElementById('btn-regex-nfa').addEventListener('click', () => handleRegexConversion('NFA'));
-            document.getElementById('btn-regex-dfa').addEventListener('click', () => handleRegexConversion('DFA'));
-            document.getElementById('btn-graph-regex').addEventListener('click', handleGraphToRegex);
-            document.getElementById('btn-nfa-dfa').addEventListener('click', handleNfaToDfa);
-            document.getElementById('btn-minimize-dfa').addEventListener('click', handleMinimizeDfa);
+            if (automataType !== 'CFG' && startState && cy && cy.getElementById(startState).length > 0) {
+                if (automataType !== 'NFA') {
+                    cy.getElementById(startState).addClass('current-state');
+                } else {
+                    const initialClosure = getEpsilonClosure(new Set([startState]));
+                    initialClosure.forEach(id => {
+                        const el = cy.getElementById(id);
+                        if (el) el.addClass('current-state');
+                    });
+                }
+            }
 
-            // CFG Actions
-            document.getElementById('generate-parse-trees').addEventListener('click', handleCfgParse);
+            const resultDisplay = document.getElementById('test-result');
+            if (resultDisplay) {
+                resultDisplay.textContent = "---";
+                resultDisplay.style.color = "#333";
+            }
 
-            // Modal
-            document.getElementById('modal-close').onclick = () => document.getElementById('gemini-modal').style.display = "none";
+            const tapeContainer = document.getElementById('tm-tape-container');
+            if (tapeContainer) {
+                tapeContainer.classList.add('hidden');
+                tapeContainer.innerHTML = '';
+            }
+
+            const btnRun = document.getElementById('run-test');
+            const selectType = document.getElementById('automata-type');
+            if (btnRun) btnRun.disabled = false;
+            if (selectType) selectType.disabled = false;
         }
 
-        // --- LOGIC AI (GEMINI) ---
+        function clearGraph() { 
+            if(cy) cy.elements().remove(); 
+            stateCounter=0; startState=null; finalStates.clear(); 
+            resetSimulation(); 
+            document.getElementById('test-case-container').innerHTML = ''; 
+            document.getElementById('cfg-test-case-container').innerHTML = ''; 
+            document.getElementById('regex-output').classList.add('hidden'); 
+            parseTreeData = {}; 
+        }
 
-        function cleanJsonString(str) {
-            if (!str) return "";
-            return str.replace(/```json/g, '').replace(/```/g, '').trim();
+        function updateSelectionUI() {
+            document.getElementById('source-node-dfa').textContent = sourceNode ? sourceNode.id() : 'chưa chọn';
+            document.getElementById('target-node-dfa').textContent = targetNode ? targetNode.id() : 'chưa chọn';
+            document.getElementById('source-node-tm').textContent = sourceNode ? sourceNode.id() : 'chưa chọn';
+            document.getElementById('target-node-tm').textContent = targetNode ? targetNode.id() : 'chưa chọn';
+        }
+        
+        function clearSelection() { 
+            if(cy) cy.$(':selected').unselect(); 
+            sourceNode=null; targetNode=null; updateSelectionUI(); 
         }
 
         async function callGemini(systemPrompt, userPrompt, jsonSchema = null) {
             showLoader(true);
-
+            const apiKey = ""; // API Key injected by environment
+            const modelName = "gemini-2.5-flash-preview-09-2025";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: userPrompt }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] }
-            };
-
-            if (jsonSchema) {
-                payload.generationConfig = {
-                    responseMimeType: "application/json",
-                    responseSchema: jsonSchema
-                };
-            }
+            const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+            if (jsonSchema) payload.generationConfig = { responseMimeType: "application/json", responseSchema: jsonSchema };
 
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                let response;
+                for (let i = 0; i < 3; i++) { // Retry logic
+                    response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (response.ok) break;
+                    await sleep(1000 * (i + 1));
+                }
                 
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) return result.candidates[0].content.parts[0].text;
+                else throw new Error("API không trả về nội dung.");
             } catch (error) {
-                console.error("Gemini Error:", error);
+                console.error("Lỗi API:", error);
                 showMessage("Lỗi kết nối AI: " + error.message, "error");
                 return null;
-            } finally {
-                showLoader(false);
-            }
+            } finally { showLoader(false); }
         }
 
-        // --- CÁC HÀM XỬ LÝ CHUYỂN ĐỔI (REGEX, CONVERSION) ---
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const cyContainer = document.getElementById('cy'); 
+            
+            cy = cytoscape({
+                container: cyContainer,
+                elements: [], 
+                style: [
+                    { selector: 'node', style: { 'background-color': '#fff', 'border-color': '#666', 'border-width': 2, 'label': 'data(label)', 'width': 40, 'height': 40, 'text-valign': 'center', 'color': '#000', 'font-size': 14, 'font-weight': 'bold', 'transition-property': 'background-color, border-color, border-width', 'transition-duration': '0.2s' } },
+                    { selector: 'edge', style: { 'width': 2, 'line-color': '#666', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#666', 'label': 'data(label)', 'font-size': 12, 'font-weight': 'medium', 'color': '#333', 'text-background-opacity': 1, 'text-background-color': '#fff', 'text-background-padding': 3, 'curve-style': 'bezier', 'control-point-step-size': 40, 'control-point-weight': 0.5, 'loop-direction': '0deg', 'loop-sweep': '-40deg', 'transition-property': 'line-color, target-arrow-color, width, opacity', 'transition-duration': '0.2s' } },
+                    { selector: '.start-state', style: { 'border-color': '#28a745', 'border-width': 4, 'background-color': '#e6ffed' } },
+                    { selector: '.final-state', style: { 'border-color': '#333', 'border-width': 4, 'border-style': 'double' } },
+                    { selector: ':selected', style: { 'background-color': '#a0deff', 'line-color': '#007bff', 'target-arrow-color': '#007bff', 'border-color': '#007bff', 'border-width': 3 } },
+                    { selector: '.current-state', style: { 'background-color': '#fde047', 'border-color': '#facc15', 'border-width': 4 } },
+                    { selector: '.traversed-edge', style: { 'line-color': '#2563eb', 'target-arrow-color': '#2563eb', 'width': 4, 'opacity': 0.8 } },
+                    { selector: '.parse-tree-non-terminal', style: { 'background-color': '#fff', 'border-color': '#3b82f6', 'border-width': 2, 'shape': 'rectangle', 'width': 'label', 'height': 30, 'padding': 6, 'text-valign': 'center', 'text-halign': 'center' } },
+                    { selector: '.parse-tree-terminal', style: { 'background-color': '#f3f4f6', 'border-width': 0, 'shape': 'ellipse', 'width': 30, 'height': 30, 'text-valign': 'center', 'text-halign': 'center' } },
+                    { selector: '.parse-tree-epsilon', style: { 'background-color': '#fff', 'border-width': 0, 'font-style': 'italic', 'color': '#6b7280' } }
+                ],
+                layout: { name: 'preset' }
+            });
 
-        // 1. Regex -> NFA/DFA
-        async function handleRegexConversion(targetType) {
+            cy.on('tap', 'node', (evt) => {
+                if (automataType === 'CFG') return;
+                const node = evt.target;
+                if (!sourceNode) { sourceNode = node; node.select(); }
+                else if (!targetNode) { targetNode = node; node.select(); }
+                else { clearSelection(); sourceNode = node; node.select(); }
+                updateSelectionUI();
+            });
+            cy.on('tap', (evt) => { if (evt.target === cy) clearSelection(); });
+            cy.on('cxttap', (evt) => {
+                if (automataType === 'CFG') return;
+                if (evt.target === cy) {
+                    const newNodeId = `q${stateCounter++}`;
+                    cy.add({ group: 'nodes', data: { id: newNodeId, label: newNodeId }, position: evt.position });
+                }
+            });
+
+            document.getElementById('automata-type').addEventListener('change', (e) => {
+                automataType = e.target.value;
+                updateVisibility();
+                showMessage(`Chuyển sang chế độ: ${automataType}`, 'success');
+                resetSimulation();
+                clearGraph();
+            });
+
+            document.getElementById('alphabet-input').addEventListener('change', (e) => {
+                const chars = e.target.value.split(',').filter(c => c.trim().length > 0).map(c => c.trim());
+                alphabet = new Set(chars);
+            });
+            
+            document.getElementById('add-state').addEventListener('click', () => {
+                const newNodeId = `q${stateCounter++}`;
+                const center = cy.extent();
+                cy.add({ group: 'nodes', data: { id: newNodeId, label: newNodeId }, position: { x: center.x1 + (center.w / 2) + (Math.random() * 50 - 25), y: center.y1 + (center.h / 2) + (Math.random() * 50 - 25) } });
+            });
+            document.getElementById('set-start').addEventListener('click', () => {
+                const selected = cy.$('node:selected');
+                if (selected.length !== 1) return showMessage("Chọn ĐÚNG MỘT trạng thái.", "error");
+                if (startState) cy.getElementById(startState).removeClass('start-state');
+                startState = selected.id();
+                selected.addClass('start-state');
+                showMessage(`Đã đặt ${startState} làm bắt đầu.`, "success");
+            });
+            document.getElementById('set-final').addEventListener('click', () => {
+                const selected = cy.$('node:selected');
+                if (selected.length === 0) return showMessage("Chọn ít nhất MỘT trạng thái.", "error");
+                selected.forEach(node => {
+                    if (finalStates.has(node.id())) { finalStates.delete(node.id()); node.removeClass('final-state'); }
+                    else { finalStates.add(node.id()); node.addClass('final-state'); }
+                });
+            });
+            document.getElementById('add-edge-dfa-nfa').addEventListener('click', addEdgeDfaNfa);
+            document.getElementById('add-edge-tm').addEventListener('click', addEdgeTm);
+            document.getElementById('delete-selected').addEventListener('click', () => {
+                const selected = cy.$(':selected');
+                if (selected.length > 0) {
+                    selected.forEach(ele => { if (ele.isNode()) { if (ele.id() === startState) startState = null; finalStates.delete(ele.id()); } });
+                    cy.remove(selected); clearSelection();
+                } else showMessage("Chưa chọn gì để xóa.", "error");
+            });
+            document.getElementById('clear-selection').addEventListener('click', clearSelection);
+            document.getElementById('validate-graph').addEventListener('click', validateGraph);
+            document.getElementById('run-test').addEventListener('click', startSimulation);
+            document.getElementById('reset-sim').addEventListener('click', resetSimulation);
+            
+            document.getElementById('generate-graph').addEventListener('click', handleGenerateGraph);
+            document.getElementById('explain-automata').addEventListener('click', handleExplainAutomata);
+            document.getElementById('suggest-test-cases').addEventListener('click', handleSuggestTestCases);
+            document.getElementById('generate-parse-trees').addEventListener('click', handleGenerateParseTrees);
+            document.getElementById('explain-cfg').addEventListener('click', handleExplainCFG);
+            document.getElementById('cfg-to-language').addEventListener('click', handleCFGToLanguage);
+            document.getElementById('regex-to-nfa').addEventListener('click', () => handleRegexToGraph('NFA'));
+            document.getElementById('regex-to-dfa').addEventListener('click', () => handleRegexToGraph('DFA'));
+            document.getElementById('automata-to-regex').addEventListener('click', handleAutomataToRegex);
+            document.getElementById('nfa-to-dfa').addEventListener('click', handleNfaToDfa);
+
+            const modal = document.getElementById('gemini-modal');
+            document.getElementById('modal-close').onclick = () => modal.style.display = "none";
+            window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; }
+
+            // Khởi tạo UI ban đầu
+            document.getElementById('automata-type').dispatchEvent(new Event('change'));
+        });
+        
+        // --- LOGIC ---
+
+        function serializeAutomata() {
+            if (automataType === 'CFG') return `CFG Rules:\n${document.getElementById('cfg-rules-input').value}`;
+            let desc = `Type: ${automataType}\nAlphabet: {${Array.from(alphabet).join(',')}}\nStart: ${startState}\nFinal: {${Array.from(finalStates).join(',')}}\nTransitions:\n`;
+            cy.edges().forEach(edge => {
+                const data = edge.data();
+                if (automataType === 'TM' && data.tm_read !== undefined) {
+                    desc += `${data.source}->${data.target} [R:${data.tm_read}, W:${data.tm_write}, M:${data.tm_move}]\n`;
+                } else if (data.tm_read === undefined) {
+                    desc += `${data.source}->${data.target} [Label:${data.label}]\n`;
+                }
+            });
+            return desc;
+        }
+
+        async function handleRegexToGraph(targetType) {
             const regex = document.getElementById('regex-input').value.trim();
-            if (!regex) return showMessage("Vui lòng nhập Regex!", "error");
+            if (!regex) return showMessage("Vui lòng nhập Regex.", "error");
 
-            const systemPrompt = `Bạn là một chuyên gia automata. Hãy chuyển đổi Regular Expression được cung cấp thành một đồ thị ${targetType} tương đương. 
-            Trả về JSON khớp với cấu trúc đồ thị. Sử dụng 'e' cho epsilon.`;
-            
-            const userPrompt = `Regex: "${regex}". Hãy tạo ${targetType}.`;
-
-            // Schema chung cho đồ thị
-            const schema = {
-                type: "OBJECT",
-                properties: {
-                    nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
-                    edges: { type: "ARRAY", items: { type: "OBJECT", properties: { source: { type: "STRING" }, target: { type: "STRING" }, label: { type: "STRING" } }, required: ["source", "target", "label"] } },
-                    startState: { type: "STRING" },
-                    finalStates: { type: "ARRAY", items: { type: "STRING" } }
-                },
-                required: ["nodes", "edges", "startState", "finalStates"]
-            };
-
-            const result = await callGemini(systemPrompt, userPrompt, schema);
-            if (result) {
-                drawGraphFromData(JSON.parse(cleanJsonString(result)), targetType);
-                // Cập nhật loại automata hiện tại cho khớp
-                automataType = targetType;
-                document.getElementById('automata-type').value = targetType;
-                updateUIForType();
-            }
-        }
-
-        // 2. Graph -> Regex
-        async function handleGraphToRegex() {
-            if (!startState) return showMessage("Đồ thị chưa có trạng thái bắt đầu", "error");
-            const graphDesc = serializeAutomata();
-            const systemPrompt = "Bạn là chuyên gia lý thuyết tính toán. Hãy chuyển đổi Automata sau thành Regular Expression chính tắc. Chỉ trả về chuỗi Regex, không giải thích.";
-            const userPrompt = `Automata:\n${graphDesc}\n\nHãy đưa ra Regex tương đương:`;
-            
-            const result = await callGemini(systemPrompt, userPrompt);
-            if (result) {
-                document.getElementById('regex-input').value = result.trim();
-                showMessage("Đã chuyển đổi thành công sang Regex!", "success");
-                showExplanationModal("Kết quả chuyển đổi Regex", result);
-            }
-        }
-
-        // 3. NFA -> DFA
-        async function handleNfaToDfa() {
-            if (automataType !== 'NFA') return showMessage("Chức năng này chỉ dành cho NFA", "error");
-            const graphDesc = serializeAutomata();
-            
-            const systemPrompt = "Bạn là một công cụ chuyển đổi NFA sang DFA. Hãy thực hiện thuật toán 'Subset Construction'. Trả về cấu trúc JSON của DFA tương đương.";
-            const userPrompt = `NFA hiện tại:\n${graphDesc}\n\nHãy chuyển sang DFA.`;
-            
-            // Dùng schema giống Regex -> Graph
-            const schema = {
-                type: "OBJECT",
-                properties: {
-                    nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
-                    edges: { type: "ARRAY", items: { type: "OBJECT", properties: { source: { type: "STRING" }, target: { type: "STRING" }, label: { type: "STRING" } }, required: ["source", "target", "label"] } },
-                    startState: { type: "STRING" },
-                    finalStates: { type: "ARRAY", items: { type: "STRING" } }
-                },
-                required: ["nodes", "edges", "startState", "finalStates"]
-            };
-
-            const result = await callGemini(systemPrompt, userPrompt, schema);
-            if (result) {
-                drawGraphFromData(JSON.parse(cleanJsonString(result)), 'DFA');
-                automataType = 'DFA';
-                document.getElementById('automata-type').value = 'DFA';
-                updateUIForType();
-                showMessage("Đã chuyển đổi NFA sang DFA thành công!");
-            }
-        }
-
-        // 4. Minimize DFA
-        async function handleMinimizeDfa() {
-            if (automataType !== 'DFA') return showMessage("Chức năng này chỉ dành cho DFA", "error");
-            const graphDesc = serializeAutomata();
-            
-            const systemPrompt = "Bạn là một công cụ tối ưu hóa DFA. Hãy sử dụng thuật toán Hopcroft hoặc Moore để tối thiểu hóa số trạng thái của DFA. Trả về JSON.";
-            const userPrompt = `DFA hiện tại:\n${graphDesc}\n\nHãy tối thiểu hóa nó.`;
+            const sys = `Bạn là chuyên gia automata. Chuyển đổi Regex thành đồ thị ${targetType}. JSON Schema bắt buộc.`;
+            const user = `Regex: "${regex}". Hãy tạo ${targetType}. Alphabet: ${Array.from(alphabet).join(',')}`;
             
             const schema = {
                 type: "OBJECT",
                 properties: {
                     nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
                     edges: { type: "ARRAY", items: { type: "OBJECT", properties: { source: { type: "STRING" }, target: { type: "STRING" }, label: { type: "STRING" } }, required: ["source", "target", "label"] } },
-                    startState: { type: "STRING" },
-                    finalStates: { type: "ARRAY", items: { type: "STRING" } }
-                },
-                required: ["nodes", "edges", "startState", "finalStates"]
-            };
-
-            const result = await callGemini(systemPrompt, userPrompt, schema);
-            if (result) {
-                drawGraphFromData(JSON.parse(cleanJsonString(result)), 'DFA');
-                showMessage("Đã tối thiểu hóa DFA!");
-            }
-        }
-
-        // --- CÁC HÀM TẠO ĐỒ THỊ CƠ BẢN & GIẢI THÍCH (GIỮ LẠI) ---
-
-        async function handleGenerateGraph() {
-            const prompt = document.getElementById('gemini-prompt').value;
-            if (!prompt) return showMessage("Nhập yêu cầu tạo đồ thị!", "error");
-
-            if (automataType === 'CFG') {
-                 // CFG Generation Logic (Simplified for brevity)
-                const sys = `Tạo CFG JSON. Rules string format: "S->aB|e"`; 
-                const user = `CFG cho: ${prompt}`;
-                const schema = { type: "OBJECT", properties: { rules: { type: "STRING" } } };
-                const res = await callGemini(sys, user, schema);
-                if(res) document.getElementById('cfg-rules-input').value = JSON.parse(cleanJsonString(res)).rules;
-                return;
-            }
-
-            // DFA/NFA/TM Generation
-            const sys = `Tạo JSON đồ thị cho ${automataType}. Schema strict. TM dùng read/write/move. DFA/NFA dùng label.`;
-            const user = `Yêu cầu: ${prompt}. Alphabet: ${document.getElementById('alphabet-input').value}`;
-            
-            const edgeProps = automataType === 'TM' 
-                ? { source: {type:"STRING"}, target:{type:"STRING"}, read:{type:"STRING"}, write:{type:"STRING"}, move:{type:"STRING"} }
-                : { source: {type:"STRING"}, target:{type:"STRING"}, label:{type:"STRING"} };
-
-            const schema = {
-                type: "OBJECT",
-                properties: {
-                    nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } } } },
-                    edges: { type: "ARRAY", items: { type: "OBJECT", properties: edgeProps } },
                     startState: { type: "STRING" },
                     finalStates: { type: "ARRAY", items: { type: "STRING" } }
                 }, required: ["nodes", "edges", "startState", "finalStates"]
             };
 
             const res = await callGemini(sys, user, schema);
-            if (res) drawGraphFromData(JSON.parse(cleanJsonString(res)), automataType);
-        }
-
-        async function handleExplain() {
-            if (automataType === 'CFG') {
-                const rules = document.getElementById('cfg-rules-input').value;
-                const res = await callGemini("Giải thích CFG này.", rules);
-                if(res) showExplanationModal("Giải thích CFG", res);
-                return;
-            }
-            const desc = serializeAutomata();
-            const res = await callGemini("Giải thích ngôn ngữ mà automata này chấp nhận một cách ngắn gọn.", desc);
-            if (res) showExplanationModal("Giải thích Automata", res);
-        }
-
-        async function handleSuggestTests() {
-            const desc = automataType === 'CFG' ? document.getElementById('cfg-rules-input').value : serializeAutomata();
-            const schema = {
-                type: "OBJECT", properties: {
-                    accept: { type: "ARRAY", items: { type: "STRING" } },
-                    reject: { type: "ARRAY", items: { type: "STRING" } }
-                }
-            };
-            const res = await callGemini("Tạo 3 test case accept và 3 reject cho ngôn ngữ này.", desc, schema);
             if (res) {
-                const data = JSON.parse(cleanJsonString(res));
-                const div = document.getElementById('test-case-list');
-                div.innerHTML = `
-                    <div class="text-green-600 font-bold">Accept:</div> ${data.accept.map(s=>`<span class="cursor-pointer bg-green-50 px-1 m-1 border rounded" onclick="document.getElementById('test-string').value='${s}'">${s||'ε'}</span>`).join('')}
-                    <div class="text-red-600 font-bold mt-1">Reject:</div> ${data.reject.map(s=>`<span class="cursor-pointer bg-red-50 px-1 m-1 border rounded" onclick="document.getElementById('test-string').value='${s}'">${s||'ε'}</span>`).join('')}
-                `;
+                try {
+                    const data = JSON.parse(cleanJsonString(res));
+                    drawGraphFromData(data, targetType);
+                    automataType = targetType;
+                    document.getElementById('automata-type').value = targetType;
+                    updateVisibility();
+                } catch (e) { console.error(e); showMessage("Lỗi dữ liệu từ AI.", "error"); }
             }
         }
 
-        async function handleCfgParse() {
-            const rules = document.getElementById('cfg-rules-input').value;
-            // Fix: tree structure simplified to avoid recursion depth issues in strict schema
+        async function handleAutomataToRegex() {
+            if (!startState) return showMessage("Chưa có đồ thị.", "error");
+            const desc = serializeAutomata();
+            const sys = "Bạn là chuyên gia automata. Chuyển đổi đồ thị sau thành Regex chính xác nhất. Chỉ trả về chuỗi Regex, không giải thích.";
+            const res = await callGemini(sys, desc);
+            if (res) {
+                const regex = res.trim();
+                document.getElementById('regex-output').textContent = regex;
+                document.getElementById('regex-output').classList.remove('hidden');
+                showMessage("Đã chuyển đổi sang Regex.", "success");
+            }
+        }
+
+        async function handleNfaToDfa() {
+            if (automataType !== 'NFA') return showMessage("Chỉ áp dụng cho NFA.", "error");
+            const desc = serializeAutomata();
+            const sys = "Bạn là chuyên gia. Chuyển NFA sau sang DFA tương đương (Subset construction). Trả về JSON graph.";
+            const user = `NFA:\n${desc}`;
+            
             const schema = {
-                type: "OBJECT", properties: {
-                    examples: { type: "ARRAY", items: { type: "OBJECT", properties: { string: {type:"STRING"}, treeJson: {type:"STRING", description: "JSON string of the parse tree object"} } } }
-                }
+                type: "OBJECT",
+                properties: {
+                    nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
+                    edges: { type: "ARRAY", items: { type: "OBJECT", properties: { source: { type: "STRING" }, target: { type: "STRING" }, label: { type: "STRING" } }, required: ["source", "target", "label"] } },
+                    startState: { type: "STRING" },
+                    finalStates: { type: "ARRAY", items: { type: "STRING" } }
+                }, required: ["nodes", "edges", "startState", "finalStates"]
             };
-            const res = await callGemini("Sinh 2 chuỗi hợp lệ và parse tree của chúng (dạng JSON string). Root node là 'S'.", rules, schema);
-            if(res) {
-                const data = JSON.parse(cleanJsonString(res));
-                // Draw first tree
-                if(data.examples.length > 0) {
+
+            const res = await callGemini(sys, user, schema);
+            if (res) {
+                try {
+                    const data = JSON.parse(cleanJsonString(res));
+                    drawGraphFromData(data, 'DFA');
+                    automataType = 'DFA';
+                    document.getElementById('automata-type').value = 'DFA';
+                    updateVisibility();
+                    showMessage("Đã chuyển NFA sang DFA.", "success");
+                } catch (e) { console.error(e); showMessage("Lỗi chuyển đổi.", "error"); }
+            }
+        }
+
+        async function handleGenerateGraph() {
+            const prompt = document.getElementById('gemini-prompt').value;
+            if (!prompt) return showMessage("Vui lòng nhập yêu cầu.", "error");
+
+            if (automataType === 'CFG') {
+                const schema = { type: "OBJECT", properties: { startSymbol: { type: "STRING" }, rules: { type: "STRING" } }, required: ["startSymbol", "rules"] };
+                const res = await callGemini("Tạo CFG JSON.", `Yêu cầu: ${prompt}`, schema);
+                if (res) {
                     try {
-                        const treeObj = JSON.parse(data.examples[0].treeJson);
-                        drawParseTree(treeObj);
-                        showMessage(`Đã vẽ cây cho chuỗi: ${data.examples[0].string}`);
-                    } catch(e) { console.error(e); }
+                        const data = JSON.parse(cleanJsonString(res));
+                        document.getElementById('cfg-rules-input').value = data.rules;
+                        showMessage("Đã tạo CFG.", "success");
+                    } catch (e) { showMessage("Lỗi dữ liệu CFG.", "error"); }
+                }
+            } else {
+                const edgeProps = automataType === 'TM' 
+                    ? { source: {type:"STRING"}, target:{type:"STRING"}, read:{type:"STRING"}, write:{type:"STRING"}, move:{type:"STRING"} }
+                    : { source: {type:"STRING"}, target:{type:"STRING"}, label:{type:"STRING"} };
+                const edgeReq = automataType === 'TM' ? ["source","target","read","write","move"] : ["source","target","label"];
+
+                const schema = {
+                    type: "OBJECT",
+                    properties: {
+                        nodes: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
+                        edges: { type: "ARRAY", items: { type: "OBJECT", properties: edgeProps, required: edgeReq } },
+                        startState: { type: "STRING" },
+                        finalStates: { type: "ARRAY", items: { type: "STRING" } }
+                    }, required: ["nodes", "edges", "startState", "finalStates"]
+                };
+                
+                const res = await callGemini(`Tạo đồ thị ${automataType}. JSON.`, `Yêu cầu: ${prompt}. Alphabet: ${Array.from(alphabet).join(',')}`, schema);
+                if (res) {
+                    try {
+                        drawGraphFromData(JSON.parse(cleanJsonString(res)), automataType);
+                    } catch (e) { showMessage("Lỗi dữ liệu đồ thị.", "error"); }
                 }
             }
         }
 
-        // --- HÀM VẼ & UI HELPER ---
+        async function handleExplainAutomata() {
+            if(automataType==='CFG') return;
+            if(!startState) return showMessage("Chưa có đồ thị", "error");
+            const res = await callGemini("Giải thích automata này.", serializeAutomata());
+            if(res) {
+                document.getElementById('gemini-explanation').textContent = res;
+                document.getElementById('gemini-modal').style.display = 'block';
+            }
+        }
+
+        async function handleExplainCFG() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if(!rules) return;
+            const res = await callGemini("Giải thích CFG này.", rules);
+            if(res) {
+                document.getElementById('gemini-explanation').textContent = res;
+                document.getElementById('gemini-modal').style.display = 'block';
+            }
+        }
+        
+        async function handleCFGToLanguage() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if(!rules) return;
+            const res = await callGemini("Suy ra ngôn ngữ L từ CFG. Trả về L = {...}", rules);
+            if(res) {
+                document.getElementById('gemini-explanation').textContent = res;
+                document.getElementById('gemini-modal').style.display = 'block';
+            }
+        }
+
+        async function handleSuggestTestCases() {
+            const desc = automataType === 'CFG' ? document.getElementById('cfg-rules-input').value : serializeAutomata();
+            const schema = { type: "OBJECT", properties: { accept: { type: "ARRAY", items: { type: "STRING" } }, reject: { type: "ARRAY", items: { type: "STRING" } } }, required: ["accept", "reject"] };
+            const res = await callGemini("Tạo 5 test case accept và 5 reject.", desc, schema);
+            if (res) {
+                try {
+                    const data = JSON.parse(cleanJsonString(res));
+                    const container = document.getElementById('test-case-container');
+                    container.innerHTML = '';
+                    
+                    const addList = (label, items, color) => {
+                        const p = document.createElement('p'); p.className = `font-medium text-sm mt-2 text-${color}-600`; p.textContent = label;
+                        container.appendChild(p);
+                        const ul = document.createElement('ul'); ul.className = 'list-disc list-inside';
+                        items.forEach(s => {
+                            const li = document.createElement('li'); li.className = 'test-case-list text-gray-700 font-mono'; 
+                            li.textContent = s===""?"(rỗng)":s; 
+                            li.onclick = () => document.getElementById('test-string').value = s;
+                            ul.appendChild(li);
+                        });
+                        container.appendChild(ul);
+                    };
+                    addList("Chấp nhận:", data.accept, "green");
+                    addList("Từ chối:", data.reject, "red");
+                } catch(e) { console.error(e); }
+            }
+        }
+        
+        async function handleGenerateParseTrees() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if(!rules.trim()) return showMessage("Nhập quy tắc CFG", "error");
+            
+            const schema = {
+                type: "OBJECT", properties: { examples: { type: "ARRAY", items: { type: "OBJECT", properties: { string: {type:"STRING"}, tree: {type:"OBJECT", description: "Parse tree structure. Recursive object: { node: string, children: array }", properties: { node: {type: "STRING"}, children: {type: "ARRAY"} } } }, required: ["string", "tree"] } } }, required: ["examples"]
+            };
+            const res = await callGemini("Sinh 3 chuỗi và parse tree.", `CFG:\n${rules}`, schema);
+            if(res) {
+                try {
+                    const data = JSON.parse(cleanJsonString(res));
+                    parseTreeData = {};
+                    const container = document.getElementById('cfg-test-case-container');
+                    container.innerHTML = '<p class="font-medium text-sm mt-2 text-green-600">Click để xem cây:</p>';
+                    const ul = document.createElement('ul'); ul.className = 'list-disc list-inside';
+                    
+                    data.examples.forEach((ex, i) => {
+                        try {
+                            parseTreeData[`t${i}`] = ex.tree; // Directly use object, no parsing needed
+                            const li = document.createElement('li');
+                            li.className = 'test-case-list text-gray-700 font-mono';
+                            li.textContent = ex.string || "ε";
+                            li.onclick = () => drawParseTree(parseTreeData[`t${i}`]);
+                            ul.appendChild(li);
+                        } catch(e) {}
+                    });
+                    container.appendChild(ul);
+                } catch(e) { console.error(e); showMessage("Lỗi parse dữ liệu cây.", "error"); }
+            }
+        }
+
+        function drawParseTree(treeData) {
+            clearGraph();
+            if(!treeData) return;
+            let counter = 0;
+            const addNode = (node, parentId) => {
+                const id = `n${counter++}`;
+                const label = node.node || node.value || node;
+                const isTerm = !node.children || node.children.length===0;
+                cy.add({ group:'nodes', data:{id:id, label:label}, classes: isTerm?'parse-tree-terminal':'parse-tree-non-terminal' });
+                if(parentId) cy.add({ group:'edges', data:{source:parentId, target:id} });
+                if(node.children) node.children.forEach(c => addNode(c, id));
+            };
+            addNode(treeData, null);
+            cy.layout({name:'breadthfirst', directed:true}).run();
+        }
 
         function drawGraphFromData(data, type) {
-            cy.elements().remove();
-            // Nodes
-            data.nodes.forEach(n => {
-                cy.add({ group: 'nodes', data: { id: n.id, label: n.id } });
-                // Update state counter to avoid ID collision
-                const num = parseInt(n.id.replace(/\D/g, '')) || 0;
-                if(num >= stateCounter) stateCounter = num + 1;
+            clearGraph();
+            let maxId = 0;
+            cy.batch(() => {
+                data.nodes.forEach(n => {
+                    cy.add({ group:'nodes', data:{id:n.id, label:n.id} });
+                    const num = parseInt(n.id.replace(/\D/g,'')) || 0;
+                    if(num > maxId) maxId = num;
+                });
+                data.edges.forEach(e => {
+                    const d = { source:e.source, target:e.target };
+                    if(type==='TM') { d.label=`${e.read}→${e.write},${e.move}`; d.tm_read=e.read; d.tm_write=e.write; d.tm_move=e.move; }
+                    else d.label = e.label;
+                    if(cy.getElementById(e.source).length && cy.getElementById(e.target).length) cy.add({ group:'edges', data:d });
+                });
             });
-            // Edges
-            data.edges.forEach(e => {
-                let label = "";
-                if (type === 'TM') label = `${e.read} → ${e.write}, ${e.move}`;
-                else label = e.label;
-                
-                const edgeData = { source: e.source, target: e.target, label: label };
-                if (type === 'TM') {
-                    edgeData.tm_read = e.read; edgeData.tm_write = e.write; edgeData.tm_move = e.move;
-                }
-                if(cy.getElementById(e.source).length && cy.getElementById(e.target).length) {
-                    cy.add({ group: 'edges', data: edgeData });
-                }
-            });
-            // State Classes
-            if (data.startState && cy.getElementById(data.startState).length) {
+            
+            if(data.startState && cy.getElementById(data.startState).length) {
                 startState = data.startState;
                 cy.getElementById(startState).addClass('start-state');
             }
-            finalStates = new Set();
-            data.finalStates.forEach(fs => {
-                if(cy.getElementById(fs).length) {
-                    finalStates.add(fs);
-                    cy.getElementById(fs).addClass('final-state');
-                }
-            });
-            cy.layout({ name: 'breadthfirst', directed: true, spacingFactor: 1.5 }).run();
-        }
-
-        function drawParseTree(node, parentId = null) {
-            if(!parentId) { cy.elements().remove(); stateCounter=0; }
-            const id = `n${stateCounter++}`;
-            const isTerminal = !node.children || node.children.length === 0;
-            const label = node.node || node.value || node; // Handle different JSON structures AI might return
-            
-            cy.add({
-                group: 'nodes',
-                data: { id: id, label: label },
-                classes: isTerminal ? 'parse-tree-terminal' : 'parse-tree-non-terminal'
-            });
-
-            if (parentId) cy.add({ group: 'edges', data: { source: parentId, target: id } });
-
-            if (node.children && Array.isArray(node.children)) {
-                node.children.forEach(child => drawParseTree(child, id));
+            if(data.finalStates) {
+                data.finalStates.forEach(fs => {
+                    if(cy.getElementById(fs).length) {
+                        finalStates.add(fs);
+                        cy.getElementById(fs).addClass('final-state');
+                    }
+                });
             }
-            
-            if(!parentId) cy.layout({ name: 'breadthfirst', directed: true }).run();
+            stateCounter = maxId + 1;
+            cy.layout({name:'breadthfirst', directed:true, spacingFactor:1.5}).run();
         }
 
-        function serializeAutomata() {
-            let desc = `Type: ${automataType}\nStart: ${startState}\nFinal: ${Array.from(finalStates).join(',')}\nEdges:\n`;
-            cy.edges().forEach(e => {
-                const d = e.data();
-                if(automataType==='TM') desc += `${d.source}->${d.target} [Read:${d.tm_read}, Write:${d.tm_write}, Move:${d.tm_move}]\n`;
-                else desc += `${d.source}->${d.target} [Label:${d.label}]\n`;
+        function addEdgeDfaNfa() {
+            if(!sourceNode || !targetNode) return showMessage("Chọn nguồn & đích", "error");
+            const label = document.getElementById('edge-symbols').value || 'a';
+            cy.add({ group:'edges', data:{source:sourceNode.id(), target:targetNode.id(), label:label} });
+            clearSelection();
+        }
+        function addEdgeTm() {
+            if(!sourceNode || !targetNode) return showMessage("Chọn nguồn & đích", "error");
+            const r = document.getElementById('tm-read-symbol').value || '_';
+            const w = document.getElementById('tm-write-symbol').value || '_';
+            const m = document.getElementById('tm-move-direction').value;
+            cy.add({ group:'edges', data:{source:sourceNode.id(), target:targetNode.id(), label:`${r}→${w},${m}`, tm_read:r, tm_write:w, tm_move:m} });
+            clearSelection();
+        }
+        function validateGraph() {
+            if(automataType!=='DFA') return showMessage("Chỉ kiểm tra DFA", "error");
+            if(!startState) return showMessage("Thiếu Start State", "error");
+            let valid=true;
+            cy.nodes().forEach(n => {
+                const syms = new Set();
+                n.outgoers('edge').forEach(e => {
+                    if(e.data('label').includes(EPSILON)) valid=false;
+                    e.data('label').split(',').forEach(s => syms.add(s));
+                });
+                alphabet.forEach(c => { if(!syms.has(c)) valid=false; });
             });
-            return desc;
+            showMessage(valid ? "DFA Hợp lệ" : "DFA Không hợp lệ", valid?"success":"error");
         }
 
-        // --- LOGIC MÔ PHỎNG (GIỮ NGUYÊN TỪ BẢN CŨ NHƯNG RÚT GỌN CHO GỌN) ---
         async function startSimulation() {
+            if(automataType==='CFG') return showMessage("Dùng 'Sinh chuỗi' cho CFG", "error");
             const input = document.getElementById('test-string').value;
             const speed = parseInt(document.getElementById('sim-speed').value);
+            if(!startState) return showMessage("Thiếu Start State", "error");
+            resetSimulation();
+            
             const resEl = document.getElementById('test-result');
-            
-            cy.elements().removeClass('current-state traversed-edge');
-            document.getElementById('tm-tape-container').innerHTML = '';
-
-            if(!startState && automataType !== 'CFG') return showMessage("Chưa có Start State", "error");
-            
-            resEl.textContent = "Running...";
+            resEl.textContent = "Running..."; resEl.style.color="#666";
             
             try {
                 let accepted = false;
-                if (automataType === 'DFA') accepted = await simDFA(input, speed);
-                else if (automataType === 'NFA') accepted = await simNFA(input, speed);
-                else if (automataType === 'TM') accepted = await simTM(input, speed);
+                if(automataType==='DFA') accepted = await simDFA(input, speed);
+                else if(automataType==='NFA') accepted = await simNFA(input, speed);
+                else if(automataType==='TM') { document.getElementById('tm-tape-container').classList.remove('hidden'); accepted = await simTM(input, speed); }
                 
                 resEl.textContent = accepted ? "ACCEPTED" : "REJECTED";
-                resEl.className = accepted ? "font-bold text-lg text-green-600" : "font-bold text-lg text-red-600";
-            } catch (e) {
-                showMessage(e.message, "error");
-                resEl.textContent = "ERROR";
-            }
+                resEl.style.color = accepted ? "#28a745" : "#dc3545";
+            } catch(e) { showMessage(e.message, "error"); }
         }
-        
-        // ... (Simulation Logic helpers simDFA, simNFA, simTM: Assume kept from previous working code for brevity in this response. 
-        // Logic should be standard graph traversal using cy.getElementById) ...
-        
-        async function simDFA(input, speed) {
-            let curr = startState;
-            cy.getElementById(curr).addClass('current-state');
-            await new Promise(r=>setTimeout(r, speed));
-            
-            for(let char of input) {
-                let next = null, edge = null;
-                cy.getElementById(curr).outgoers('edge').forEach(e => {
-                    if(e.data('label') === char) { next = e.target().id(); edge = e; }
-                });
-                if(!next) throw new Error("Stuck at " + curr);
-                cy.getElementById(curr).removeClass('current-state');
-                edge.addClass('traversed-edge');
-                await new Promise(r=>setTimeout(r, speed/2));
-                edge.removeClass('traversed-edge');
-                curr = next;
-                cy.getElementById(curr).addClass('current-state');
-                await new Promise(r=>setTimeout(r, speed/2));
-            }
-            return finalStates.has(curr);
-        }
-        
-        async function simNFA(input, speed) {
-            // Basic BFS simulation for NFA with Epsilon closure support would go here
-            // For this snippet, assuming simple transition matching
-            let currentStates = new Set([startState]);
-            // (Add epsilon closure logic here)
-            
-            cy.nodes().removeClass('current-state');
-            currentStates.forEach(s => cy.getElementById(s).addClass('current-state'));
-            await new Promise(r=>setTimeout(r, speed));
 
+        async function simDFA(input, speed) {
+            let curr = cy.getElementById(startState);
+            curr.addClass('current-state'); await sleep(speed);
             for(let char of input) {
-                let nextStates = new Set();
-                for(let s of currentStates) {
-                    cy.getElementById(s).outgoers('edge').forEach(e => {
-                        const labels = e.data('label').split(','); // Handle "a,b"
-                        if(labels.includes(char)) {
-                            nextStates.add(e.target().id());
-                            e.addClass('traversed-edge');
+                let next=null, edge=null;
+                curr.outgoers('edge').forEach(e => { if(e.data('label')===char) { next=e.target(); edge=e; } });
+                if(next) {
+                    curr.removeClass('current-state'); edge.addClass('traversed-edge'); await sleep(speed/2);
+                    edge.removeClass('traversed-edge'); curr=next; curr.addClass('current-state'); await sleep(speed/2);
+                } else throw new Error("Stuck");
+            }
+            const acc = finalStates.has(curr.id());
+            if(!acc) setTimeout(()=>curr.removeClass('current-state'), 1000);
+            return acc;
+        }
+
+        function getEpsilonClosure(states) {
+            let closure = new Set(states);
+            let stack = [...states];
+            while(stack.length) {
+                let id = stack.pop();
+                cy.getElementById(id).outgoers('edge').forEach(e => {
+                    if(e.data('label').split(',').includes(EPSILON)) {
+                        let tid = e.target().id();
+                        if(!closure.has(tid)) { closure.add(tid); stack.push(tid); }
+                    }
+                });
+            }
+            return closure;
+        }
+
+        async function simNFA(input, speed) {
+            let currs = getEpsilonClosure(new Set([startState]));
+            cy.elements().removeClass('current-state');
+            currs.forEach(id => cy.getElementById(id).addClass('current-state'));
+            await sleep(speed);
+            
+            for(let char of input) {
+                let nexts = new Set();
+                currs.forEach(id => {
+                    cy.getElementById(id).outgoers('edge').forEach(e => {
+                        if(e.data('label').split(',').includes(char)) {
+                            nexts.add(e.target().id()); e.addClass('traversed-edge');
                         }
                     });
-                }
-                await new Promise(r=>setTimeout(r, speed/2));
-                cy.edges().removeClass('traversed-edge');
-                cy.nodes().removeClass('current-state');
-                
-                if(nextStates.size === 0) return false;
-                currentStates = nextStates;
-                currentStates.forEach(s => cy.getElementById(s).addClass('current-state'));
-                await new Promise(r=>setTimeout(r, speed/2));
+                });
+                await sleep(speed/2);
+                let epsNexts = getEpsilonClosure(nexts);
+                cy.elements().removeClass('current-state traversed-edge');
+                epsNexts.forEach(id => cy.getElementById(id).addClass('current-state'));
+                await sleep(speed/2);
+                currs = epsNexts;
+                if(currs.size === 0) return false;
             }
-            for(let s of currentStates) if(finalStates.has(s)) return true;
+            for(let id of currs) if(finalStates.has(id)) return true;
             return false;
         }
 
         async function simTM(input, speed) {
-             // Simplified TM Logic
-            let tape = input.split('');
-            if(tape.length === 0) tape = ['_'];
-            let head = 0;
-            let curr = startState;
-            const container = document.getElementById('tm-tape-container');
-            
-            const renderTape = () => {
-                container.innerHTML = tape.map((c,i) => `<span class="tape-cell ${i===head?'tape-head':''}">${c}</span>`).join('');
-            }
+            let tape = {}; input.split('').forEach((c,i)=>tape[i]=c);
+            let head=0; let curr=cy.getElementById(startState);
+            const render = (h) => {
+                const div = document.getElementById('tm-tape-container'); div.innerHTML='';
+                const keys = Object.keys(tape).map(Number); if(!keys.length) keys.push(0);
+                const min = Math.min(Math.min(...keys,h)-5, -5);
+                const max = Math.max(Math.max(...keys,h)+5, 5);
+                for(let i=min; i<=max; i++) {
+                    const sp = document.createElement('span'); sp.className=`tape-cell ${i===h?'tape-head':''}`;
+                    sp.textContent=tape[i]||'_'; div.appendChild(sp);
+                }
+                const hEl = div.querySelector('.tape-head'); if(hEl) hEl.scrollIntoView({inline:'center'});
+            };
 
-            for(let i=0; i<100; i++) { // Limit steps
+            for(let i=0; i<1000; i++) {
                 cy.elements().removeClass('current-state traversed-edge');
-                cy.getElementById(curr).addClass('current-state');
-                renderTape();
-                await new Promise(r=>setTimeout(r, speed));
+                curr.addClass('current-state'); render(head); await sleep(speed);
+                if(finalStates.has(curr.id())) return true;
                 
-                if(finalStates.has(curr)) return true;
+                const r = tape[head]||'_';
+                let edge=null;
+                curr.outgoers('edge').forEach(e => { if(e.data('tm_read')===r) edge=e; });
+                if(!edge) return false;
 
-                const read = tape[head] || '_';
-                let transition = null;
-                cy.getElementById(curr).outgoers('edge').forEach(e => {
-                    if(e.data('tm_read') === read) transition = e;
-                });
-
-                if(!transition) return false; // Halt reject
-
-                transition.addClass('traversed-edge');
-                tape[head] = transition.data('tm_write');
-                if(transition.data('tm_move') === 'R') head++; else head--;
-                if(head < 0) { tape.unshift('_'); head=0; }
-                if(head >= tape.length) tape.push('_');
-                
-                curr = transition.target().id();
+                edge.addClass('traversed-edge'); await sleep(speed/2);
+                const w = edge.data('tm_write');
+                if(w==='_') delete tape[head]; else tape[head]=w;
+                render(head);
+                if(edge.data('tm_move')==='R') head++; else head--;
+                curr = edge.target();
+                render(head); await sleep(speed/2);
             }
-            return false;
-        }
-
-        // --- UI HELPERS ---
-        function addNodeAt(pos) {
-            const id = `q${stateCounter++}`;
-            const p = pos || { x: 300, y: 200 };
-            cy.add({ group: 'nodes', data: { id: id, label: id }, position: p });
-        }
-        function setStartState() {
-            if (!sourceNode) return showMessage("Chọn 1 nút trước", "error");
-            if (startState) cy.getElementById(startState).removeClass('start-state');
-            startState = sourceNode.id();
-            sourceNode.addClass('start-state');
-            clearSelection();
-        }
-        function toggleFinalState() {
-            if (!sourceNode) return showMessage("Chọn 1 nút trước", "error");
-            if (finalStates.has(sourceNode.id())) {
-                finalStates.delete(sourceNode.id());
-                sourceNode.removeClass('final-state');
-            } else {
-                finalStates.add(sourceNode.id());
-                sourceNode.addClass('final-state');
-            }
-            clearSelection();
-        }
-        function deleteSelected() {
-            const selected = cy.$(':selected');
-            selected.forEach(ele => {
-                if (ele.id() === startState) startState = null;
-                finalStates.delete(ele.id());
-            });
-            cy.remove(selected);
-            clearSelection();
-        }
-        function addEdgeStandard() {
-            if (!sourceNode || !targetNode) return showMessage("Chọn Nguồn & Đích", "error");
-            const label = document.getElementById('edge-symbols').value || 'a';
-            cy.add({ group: 'edges', data: { source: sourceNode.id(), target: targetNode.id(), label: label } });
-            clearSelection();
-        }
-        function addEdgeTM() {
-            if (!sourceNode || !targetNode) return showMessage("Chọn Nguồn & Đích", "error");
-            const read = document.getElementById('tm-read').value || '_';
-            const write = document.getElementById('tm-write').value || '_';
-            const move = document.getElementById('tm-move').value || 'R';
-            const label = `${read} → ${write}, ${move}`;
-            cy.add({ group: 'edges', data: { source: sourceNode.id(), target: targetNode.id(), label: label, tm_read: read, tm_write: write, tm_move: move } });
-            clearSelection();
-        }
-        function clearSelection() {
-            cy.$(':selected').unselect();
-            sourceNode = null; targetNode = null;
-            updateSelectionLabel();
-        }
-        function updateSelectionLabel() {
-            document.getElementById('src-node').textContent = sourceNode ? sourceNode.id() : '-';
-            document.getElementById('tgt-node').textContent = targetNode ? targetNode.id() : '-';
-        }
-        function showMessage(msg, type='success') {
-            const box = document.getElementById('message-box');
-            box.textContent = msg;
-            box.className = `message-box ${type==='error'?'message-error':'message-success'}`;
-            box.style.display = 'block';
-            setTimeout(()=>box.style.display='none', 3000);
-        }
-        function showLoader(show) { document.getElementById('gemini-loader').style.display = show ? 'block' : 'none'; }
-        function showExplanationModal(title, text) {
-            document.querySelector('#gemini-modal h3').textContent = "✨ " + title;
-            document.getElementById('gemini-explanation').textContent = text;
-            document.getElementById('gemini-modal').style.display = 'block';
-        }
-        function clearGraph() { cy.elements().remove(); stateCounter=0; startState=null; finalStates.clear(); }
-        
-        function updateUIForType() {
-            document.getElementById('manual-controls').classList.remove('hidden');
-            document.getElementById('edge-controls').classList.remove('hidden');
-            document.getElementById('tm-controls').classList.add('hidden');
-            document.getElementById('cfg-controls').classList.add('hidden');
-            document.getElementById('cy').style.display = 'block';
-
-            // Regex panel controls visibility
-            const regexBtns = ['btn-regex-nfa', 'btn-regex-dfa', 'btn-graph-regex', 'btn-nfa-dfa', 'btn-minimize-dfa'];
-            regexBtns.forEach(id => document.getElementById(id).disabled = false);
-
-            if (automataType === 'TM') {
-                document.getElementById('edge-controls').classList.add('hidden');
-                document.getElementById('tm-controls').classList.remove('hidden');
-                // Disable regex tools for TM
-                regexBtns.forEach(id => document.getElementById(id).disabled = true);
-            } else if (automataType === 'CFG') {
-                document.getElementById('manual-controls').classList.add('hidden'); // Hide manual graph tools
-                document.getElementById('cfg-controls').classList.remove('hidden');
-                // Disable regex tools for CFG
-                regexBtns.forEach(id => document.getElementById(id).disabled = true);
-            }
+            throw new Error("TM Loop limit exceeded");
         }
 
     </script>
