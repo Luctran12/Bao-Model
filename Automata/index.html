@@ -394,7 +394,7 @@
 
         async function callGemini(systemPrompt, userPrompt, jsonSchema = null) {
             showLoader(true);
-            const apiKey = ""; // API Key injected by environment
+            const apiKey = "AIzaSyAz4DEdxOvezX_FBaodD8I3XnKvTf3Vk0Q"; // API Key injected by environment
             const modelName = "gemini-2.5-flash-preview-09-2025";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
             const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
