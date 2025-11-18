@@ -339,7 +339,7 @@
 
         const EPSILON = 'e'; // Ký tự đại diện cho Epsilon
         
-        // BIẾN API (Để trống, sẽ được cung cấp bởi môi trường)
+        // BIẾN API (Theo yêu cầu của bạn, giữ lại trong tệp)
         const apiKey = "AIzaSyBbkzptNoC8lXLH8D65HC8Hn7TreipxyeI"; 
 
         // --- KHỞI TẠO CYTOSCAPE ---
@@ -389,9 +389,11 @@
                             'text-background-color': '#fff',
                             'text-background-padding': 3,
                             'curve-style': 'bezier',
-                            'control-point-distance': 20, // Giúp các cạnh vòng (loop) dễ thấy hơn
+                            /* SỬA LỖI HIỂN THỊ ĐÈ NHAU */
+                            'control-point-step-size': 40, // Tách các cạnh song song
+                            'control-point-weight': 0.5,
                             'loop-direction': '0deg',
-                            'loop-sweep': '-40deg', // Điều chỉnh cạnh vòng
+                            'loop-sweep': '-40deg', 
                             'transition-property': 'line-color, target-arrow-color, width, opacity',
                             'transition-duration': '0.2s'
                         }
@@ -751,6 +753,23 @@ Bảng chữ cái là: {${currentAlphabet}}.
 ${currentAutomataType === 'TM' ? `Ký tự trống là: '${currentBlankSymbol}'.` : ''}
 Hãy tạo đồ thị.`;
 
+            // === SỬA LỖI: Tạo Schema Động ===
+            let edgeProperties = {
+                source: { type: "STRING" },
+                target: { type: "STRING" }
+            };
+            let edgeRequired = ["source", "target"];
+
+            if (currentAutomataType === 'TM') {
+                edgeProperties.read = { type: "STRING" };
+                edgeProperties.write = { type: "STRING" };
+                edgeProperties.move = { type: "STRING" };
+                edgeRequired.push("read", "write", "move");
+            } else { // DFA/NFA
+                edgeProperties.label = { type: "STRING" };
+                edgeRequired.push("label");
+            }
+
             // JSON Schema cho LLM
             const schema = {
                 type: "OBJECT",
@@ -767,15 +786,8 @@ Hãy tạo đồ thị.`;
                         type: "ARRAY",
                         items: {
                             type: "OBJECT",
-                            properties: {
-                                source: { type: "STRING" },
-                                target: { type: "STRING" },
-                                label: { type: "STRING" }, // For DFA/NFA
-                                read: { type: "STRING" },  // For TM
-                                write: { type: "STRING" }, // For TM
-                                move: { type: "STRING" }   // For TM
-                            },
-                            required: ["source", "target"]
+                            properties: edgeProperties, // Sử dụng schema động
+                            required: edgeRequired // Sử dụng schema động
                         }
                     },
                     startState: { type: "STRING" },
@@ -786,6 +798,7 @@ Hãy tạo đồ thị.`;
                 },
                 required: ["nodes", "edges", "startState", "finalStates"]
             };
+            // === KẾT THÚC SỬA LỖI ===
 
             const jsonString = await callGemini(systemPrompt, userPrompt, schema);
 
@@ -796,7 +809,8 @@ Hãy tạo đồ thị.`;
 
             try {
                 const graphData = JSON.parse(jsonString);
-                drawGraphFromData(graphData);
+                // SỬA LỖI 2: Truyền loại automata đã tạo vào hàm vẽ
+                drawGraphFromData(graphData, currentAutomataType);
             } catch (e) {
                 console.error("Lỗi parse JSON từ Gemini:", e, jsonString);
                 showMessage("Lỗi: AI trả về dữ liệu không hợp lệ.", "error");
@@ -915,8 +929,8 @@ Hãy tạo đồ thị.`;
             document.getElementById('test-case-container').innerHTML = ''; // Xóa gợi ý test
         }
 
-        // Hàm vẽ đồ thị từ dữ liệu JSON
-        function drawGraphFromData(graphData) {
+        // SỬA LỖI 2: Hàm vẽ đồ thị từ dữ liệu JSON (thêm tham số graphType)
+        function drawGraphFromData(graphData, graphType) {
             clearGraph();
             let maxStateNum = -1;
 
@@ -945,7 +959,8 @@ Hãy tạo đồ thị.`;
                             target: edge.target
                         };
 
-                        if (automataType === 'TM') {
+                        // SỬA LỖI 2: Sử dụng `graphType` thay vì `automataType`
+                        if (graphType === 'TM') {
                             edgeData.label = `${edge.read} → ${edge.write}, ${edge.move}`;
                             edgeData.tm_read = edge.read;
                             edgeData.tm_write = edge.write;
@@ -984,6 +999,13 @@ Hãy tạo đồ thị.`;
 
                 // Cập nhật stateCounter
                 stateCounter = maxStateNum + 1;
+                
+                // SỬA LỖI 2: Cập nhật UI để khớp với đồ thị đã tạo
+                automataType = graphType;
+                const typeSelect = document.getElementById('automata-type');
+                typeSelect.value = graphType;
+                typeSelect.dispatchEvent(new Event('change')); // Kích hoạt sự kiện change để cập nhật UI
+                // KẾT THÚC SỬA LỖI
 
                 // Chạy layout
                 cy.layout({
@@ -1253,6 +1275,7 @@ Hãy tạo đồ thị.`;
                 }
             } catch (error) {
                 console.error("Simulation error:", error);
+                // SỬA LỖI: Không ném lỗi ra ngoài nữa, chỉ hiển thị thông báo
                 showMessage(error.message, "error");
                 result = false;
             }
@@ -1272,7 +1295,7 @@ Hãy tạo đồ thị.`;
 
             // Bỏ highlight trạng thái cuối cùng
             setTimeout(() => {
-                 cy.$('.current-state').removeClass('current-state');
+                cy.$('.current-state').removeClass('current-state');
             }, 2000);
         }
 
@@ -1322,7 +1345,7 @@ Hãy tạo đồ thị.`;
             // Kết thúc chuỗi, kiểm tra xem có ở trạng thái kết thúc không
             const isAccepted = finalStates.has(currentState.id());
             if (!isAccepted) {
-                 setTimeout(() => currentState.removeClass('current-state'), 1000);
+                setTimeout(() => currentState.removeClass('current-state'), 1000);
             }
             return isAccepted;
         }
@@ -1339,7 +1362,7 @@ Hãy tạo đồ thị.`;
 
             for (const char of inputString) {
                 if (!alphabet.has(char) && char.length > 0) { // Cho phép chuỗi rỗng
-                     throw new Error(`Ký tự '${char}' không có trong bảng chữ cái.`);
+                    throw new Error(`Ký tự '${char}' không có trong bảng chữ cái.`);
                 }
 
                 let nextStates = new Set();
@@ -1382,7 +1405,7 @@ Hãy tạo đồ thị.`;
                 }
             }
             if (!accepted) {
-                 setTimeout(() => cy.elements().removeClass('current-state'), 1000);
+                setTimeout(() => cy.elements().removeClass('current-state'), 1000);
             }
             return accepted;
         }
@@ -1482,7 +1505,18 @@ Hãy tạo đồ thị.`;
 
                 // 4. Nếu kẹt
                 if (!foundEdge) {
-                    throw new Error(`Máy Turing bị kẹt! Không có đường chuyển cho '${readSymbol}' tại ${currentState.id()}`);
+                    // === SỬA LỖI ===
+                    // Không ném lỗi. Kẹt ở trạng thái không chấp nhận có nghĩa là TỪ CHỐI.
+                    // Hàm `startSimulation` sẽ bắt `Error` và hiển thị nó.
+                    // Chúng ta nên ném lỗi để hàm `startSimulation` biết và hiển thị TỪ CHỐI
+                    // (Logic của hàm `startSimulation` là catch lỗi và return false)
+                    // Hoặc tốt hơn:
+                    // Vì chúng ta đã kiểm tra trạng thái chấp nhận ở đầu vòng lặp,
+                    // việc kẹt ở đây có nghĩa là kẹt ở trạng thái KHÔNG chấp nhận.
+                    return false; // -> Từ chối
+                    // Dòng cũ bị lỗi:
+                    // throw new Error(`Máy Turing bị kẹt! Không có đường chuyển cho '${readSymbol}' tại ${currentState.id()}`);
+                    // === KẾT THÚC SỬA LỖI ===
                 }
 
                 // 5. Thực hiện đường chuyển
