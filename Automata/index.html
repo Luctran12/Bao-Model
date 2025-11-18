@@ -157,6 +157,31 @@
         .test-case-list:hover {
             background-color: #e5e7eb;
         }
+
+        /* Thêm kiểu cho CFG Parse Tree */
+        .parse-tree-non-terminal {
+            background-color: #fff;
+            border-color: #3b82f6; /* blue-500 */
+            border-width: 2px;
+            shape: 'rectangle';
+            width: 'label';
+            height: 30px;
+            padding: 6px;
+        }
+        .parse-tree-terminal {
+            background-color: #f3f4f6; /* gray-100 */
+            border-width: 0;
+            shape: 'ellipse';
+            width: 30px;
+            height: 30px;
+        }
+        .parse-tree-epsilon {
+            background-color: #fff;
+            border-width: 0;
+            font-style: 'italic';
+            color: '#6b7280'; /* gray-500 */
+        }
+
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
@@ -182,11 +207,12 @@
                     <option value="DFA">DFA (Đơn định)</option>
                     <option value="NFA">NFA (Không đơn định)</option>
                     <option value="TM">Turing Machine</option>
+                    <option value="CFG">CFG (Ngữ pháp)</option> <!-- THÊM MỚI -->
                 </select>
             </div>
 
             <!-- Định nghĩa bảng chữ cái -->
-            <div class="mb-4">
+            <div id="alphabet-controls" class="mb-4"> <!-- Thêm ID để ẩn/hiện -->
                 <label for="alphabet-input" class="block text-sm font-medium mb-1">Bảng chữ cái (cách nhau bằng dấu phẩy):</label>
                 <input type="text" id="alphabet-input" value="a,b" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="a,b">
             </div>
@@ -197,17 +223,17 @@
                 <input type="text" id="tm-blank-symbol" value="_" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="_, B, v.v.">
             </div>
             
-            <!-- TÍNH NĂNG MỚI: Tạo đồ thị từ AI -->
+            <!-- TÍNH NĂNG MỚI: Tạo đồ thị/ngữ pháp từ AI -->
             <fieldset class="border rounded-md p-3 mb-4">
-                <legend class="text-md font-semibold px-2">✨ Tạo Automata (AI)</legend>
+                <legend class="text-md font-semibold px-2">✨ Tạo (AI)</legend> <!-- Đổi tên -->
                 <label for="gemini-prompt" class="block text-sm font-medium mb-1">Nhập yêu cầu của bạn:</label>
                 <textarea id="gemini-prompt" rows="3" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ví dụ: DFA chấp nhận chuỗi kết thúc bằng 'a'"></textarea>
-                <button id="generate-graph" class="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150">Tạo Đồ thị</button>
+                <button id="generate-graph" class="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-medium py-2 px-4 rounded-md transition duration-150">Tạo</button> <!-- Đổi tên -->
             </fieldset>
             <!-- KẾT THÚC TÍNH NĂNG MỚI -->
 
-            <!-- Thao tác với trạng thái -->
-            <fieldset class="border rounded-md p-3 mb-4">
+            <!-- Thao tác với trạng thái (THÊM ID) -->
+            <fieldset id="manual-state-controls" class="border rounded-md p-3 mb-4">
                 <legend class="text-md font-semibold px-2">Trạng thái (Thủ công)</legend>
                 <button id="add-state" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Thêm Trạng thái</button>
                 <button id="set-start" class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Đặt làm Bắt đầu</button>
@@ -249,8 +275,15 @@
                 <button id="add-edge-tm" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-md transition duration-150">Thêm Đường chuyển</button>
             </fieldset>
 
-            <!-- Xóa và Xóa lựa chọn -->
-            <fieldset class="border rounded-md p-3 mb-4">
+            <!-- Bảng điều khiển CFG (MỚI) -->
+            <fieldset id="cfg-controls" class="border rounded-md p-3 mb-4 hidden">
+                <legend class="text-md font-semibold px-2">Quy tắc CFG</legend>
+                <label for="cfg-rules-input" class="block text-sm font-medium mb-1">Quy tắc (mỗi dòng 1 quy tắc):</label>
+                <textarea id="cfg-rules-input" rows="10" class="w-full p-2 border rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="S -> aSb | e&#10;S -> ..."></textarea>
+            </fieldset>
+
+            <!-- Xóa và Xóa lựa chọn (THÊM ID) -->
+            <fieldset id="other-controls" class="border rounded-md p-3 mb-4">
                 <legend class="text-md font-semibold px-2">Khác</legend>
                 <button id="delete-selected" class="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">Xóa (Đã chọn)</button>
                 <button id="clear-selection" class="w-full bg-gray-400 hover:bg-gray-500 text-black font-medium py-2 px-4 rounded-md transition duration-150">Bỏ chọn</button>
@@ -265,19 +298,19 @@
 
         <!-- Bảng kiểm tra (Test) -->
         <div class="w-full md:w-1/4 lg:w-1/5 bg-white p-4 rounded-lg shadow-lg overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Kiểm tra & Thực thi</h2>
             
             <!-- Loading Spinner -->
             <div id="gemini-loader" class="loader mb-4"></div>
             
-            <!-- Nút Tính năng Gemini -->
-            <div class="mb-4">
+            <!-- Nút Tính năng Gemini (THÊM ID) -->
+            <div id="finite-automata-ai-panel" class="mb-4">
+                <h2 class="text-lg font-semibold mb-4 border-b pb-2">Kiểm tra Automata</h2>
                 <button id="explain-automata" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-2">✨ Giải thích Automata này</button>
                 <button id="validate-graph" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-md transition duration-150">Kiểm tra tính hợp lệ (DFA)</button>
             </div>
 
-            <!-- Khu vực Test chuỗi -->
-            <fieldset class="border rounded-md p-3">
+            <!-- Khu vực Test chuỗi (THÊM ID) -->
+            <fieldset id="finite-automata-run-panel" class="border rounded-md p-3">
                 <legend class="text-md font-semibold px-2">Thực thi chuỗi</legend>
                 <label for="test-string" class="block text-sm font-medium mb-1">Chuỗi đầu vào:</label>
                 <input type="text" id="test-string" class="w-full p-2 border rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500" placeholder="abba">
@@ -308,6 +341,19 @@
                 <div id="test-case-container" class="mt-2"></div>
 
             </fieldset>
+
+            <!-- Bảng Phân tích CFG (MỚI) -->
+            <div id="cfg-parse-panel" class="hidden">
+                <h2 class="text-lg font-semibold mb-4 border-b pb-2">Phân tích CFG (AI)</h2>
+                <!-- THÊM NÚT MỚI -->
+                <button id="explain-cfg" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-3">✨ Giải thích CFG này</button>
+                <button id="cfg-to-language" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mb-3">✨ Suy ra ngôn ngữ L (AI)</button>
+                
+                <p class="text-sm text-gray-600 mb-2">Sử dụng các quy tắc CFG ở bảng bên trái.</p>
+                <button id="generate-parse-trees" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 mt-4">✨ Sinh chuỗi & Cây phân giải</button>
+                <div id="cfg-test-case-container" class="mt-2"></div>
+            </div>
+
         </div>
 
     </div>
@@ -333,6 +379,7 @@
         let finalStates = new Set();
         let automataType = 'DFA';
         let alphabet = new Set(['a', 'b']);
+        let parseTreeData = {}; // MỚI: Lưu trữ cây phân giải
         
         let sourceNode = null;
         let targetNode = null;
@@ -340,6 +387,7 @@
         const EPSILON = 'e'; // Ký tự đại diện cho Epsilon
         
         // BIẾN API (Theo yêu cầu của bạn, giữ lại trong tệp)
+        // LƯU Ý BẢO MẬT: Không public key này lên internet!
         const apiKey = "AIzaSyBbkzptNoC8lXLH8D65HC8Hn7TreipxyeI"; 
 
         // --- KHỞI TẠO CYTOSCAPE ---
@@ -363,7 +411,7 @@
                             'background-color': '#fff',
                             'border-color': '#666',
                             'border-width': 2,
-                            'label': 'data(id)',
+                            'label': 'data(label)', // SỬA: dùng data(label)
                             'width': 40,
                             'height': 40,
                             'text-valign': 'center',
@@ -441,6 +489,42 @@
                             'width': 4,
                             'opacity': 0.8,
                         }
+                    },
+                    // (MỚI) Kiểu cho cây phân giải
+                    {
+                        selector: '.parse-tree-non-terminal',
+                        style: {
+                            'background-color': '#fff',
+                            'border-color': '#3b82f6', // blue-500
+                            'border-width': 2,
+                            'shape': 'rectangle',
+                            'width': 'label',
+                            'height': 30,
+                            'padding': 6,
+                            'text-valign': 'center',
+                            'text-halign': 'center'
+                        }
+                    },
+                    {
+                        selector: '.parse-tree-terminal',
+                        style: {
+                            'background-color': '#f3f4f6', // gray-100
+                            'border-width': 0,
+                            'shape': 'ellipse',
+                            'width': 30,
+                            'height': 30,
+                            'text-valign': 'center',
+                            'text-halign': 'center'
+                        }
+                    },
+                    {
+                        selector: '.parse-tree-epsilon',
+                        style: {
+                            'background-color': '#fff',
+                            'border-width': 0,
+                            'font-style': 'italic',
+                            'color': '#6b7280', // gray-500
+                        }
                     }
                 ],
                 
@@ -452,6 +536,9 @@
 
             // Bắt sự kiện click vào node để chọn nguồn/đích
             cy.on('tap', 'node', (evt) => {
+                // Chỉ hoạt động nếu không phải CFG
+                if (automataType === 'CFG') return;
+
                 const node = evt.target;
 
                 if (!sourceNode) {
@@ -478,13 +565,16 @@
 
             // THAY ĐỔI: Sử dụng 'Chuột Phải' (cxttap) để thêm node
             cy.on('cxttap', (evt) => {
+                // Chỉ hoạt động nếu không phải CFG
+                if (automataType === 'CFG') return;
+
                 // Chỉ thêm node nếu chuột phải vào nền (không phải node/cạnh)
                 if (evt.target === cy) {
                     
                     const newNodeId = `q${stateCounter++}`;
                     cy.add({
                         group: 'nodes',
-                        data: { id: newNodeId },
+                        data: { id: newNodeId, label: newNodeId }, // Thêm label
                         position: evt.position // Sử dụng vị trí chuột phải
                     });
                 }
@@ -496,21 +586,67 @@
             // Lắng nghe thay đổi loại Automata
             document.getElementById('automata-type').addEventListener('change', (e) => {
                 automataType = e.target.value;
+                
+                // Lấy tất cả các panel
                 const dfaNfaControls = document.getElementById('dfa-nfa-edge-controls');
                 const tmControls = document.getElementById('tm-edge-controls');
                 const tmBlankSymbol = document.getElementById('tm-blank-symbol-div');
+                const manualStateControls = document.getElementById('manual-state-controls');
+                const deleteControls = document.getElementById('other-controls');
+                const alphabetControls = document.getElementById('alphabet-controls');
 
-                if (automataType === 'TM') {
-                    dfaNfaControls.classList.add('hidden');
-                    tmControls.classList.remove('hidden');
-                    tmBlankSymbol.classList.remove('hidden');
-                } else {
-                    dfaNfaControls.classList.remove('hidden');
-                    tmControls.classList.add('hidden');
-                    tmBlankSymbol.classList.add('hidden');
+                const cfgControls = document.getElementById('cfg-controls');
+                const cfgParsePanel = document.getElementById('cfg-parse-panel');
+
+                const faAiPanel = document.getElementById('finite-automata-ai-panel');
+                const faRunPanel = document.getElementById('finite-automata-run-panel');
+
+                const cyContainer = document.getElementById('cy');
+
+                // Ẩn tất cả các panel điều khiển
+                dfaNfaControls.classList.add('hidden');
+                tmControls.classList.add('hidden');
+                tmBlankSymbol.classList.add('hidden');
+                manualStateControls.classList.add('hidden');
+                deleteControls.classList.add('hidden');
+                alphabetControls.classList.add('hidden');
+                cfgControls.classList.add('hidden');
+                cfgParsePanel.classList.add('hidden');
+                faAiPanel.classList.add('hidden');
+                faRunPanel.classList.add('hidden');
+                cyContainer.classList.add('hidden'); // Ẩn luôn khu vực vẽ
+
+                if (automataType === 'CFG') {
+                    // Hiển thị panel CFG
+                    cfgControls.classList.remove('hidden');
+                    cfgParsePanel.classList.remove('hidden');
+                    cyContainer.classList.remove('hidden'); // Giữ lại để vẽ cây
+                    document.getElementById('gemini-prompt').placeholder = "Ví dụ: L = {a^n b^n | n >= 0}";
+                    document.getElementById('generate-graph').textContent = "Tạo Ngữ pháp";
+
+                } else { // DFA, NFA, TM
+                    // Hiển thị panel Automata
+                    manualStateControls.classList.remove('hidden');
+                    deleteControls.classList.remove('hidden');
+                    faAiPanel.classList.remove('hidden');
+                    faRunPanel.classList.remove('hidden');
+                    cyContainer.classList.remove('hidden');
+                    alphabetControls.classList.remove('hidden');
+                    document.getElementById('gemini-prompt').placeholder = "Ví dụ: DFA chấp nhận chuỗi kết thúc bằng 'a'";
+                    document.getElementById('generate-graph').textContent = "Tạo Đồ thị";
+                    
+                    // Xử lý riêng TM
+                    if (automataType === 'TM') {
+                        tmControls.classList.remove('hidden');
+                        tmBlankSymbol.classList.remove('hidden');
+                    } else {
+                        dfaNfaControls.classList.remove('hidden');
+                    }
                 }
+                
                 showMessage(`Chuyển sang chế độ: ${automataType}`, 'success');
                 resetSimulation(); // Reset khi đổi loại
+                clearGraph(); // Xóa đồ thị/cây cũ
             });
 
             // Lắng nghe thay đổi bảng chữ cái
@@ -527,7 +663,7 @@
                 const center = cy.extent();
                 cy.add({
                     group: 'nodes',
-                    data: { id: newNodeId },
+                    data: { id: newNodeId, label: newNodeId }, // Thêm label
                     position: {
                         x: center.x1 + (center.w / 2) + (Math.random() * 50 - 25), // Thêm chút ngẫu nhiên để không bị trùng
                         y: center.y1 + (center.h / 2) + (Math.random() * 50 - 25)
@@ -613,6 +749,10 @@
             document.getElementById('generate-graph').addEventListener('click', handleGenerateGraph);
             document.getElementById('explain-automata').addEventListener('click', handleExplainAutomata);
             document.getElementById('suggest-test-cases').addEventListener('click', handleSuggestTestCases);
+            document.getElementById('generate-parse-trees').addEventListener('click', handleGenerateParseTrees); // (MỚI)
+            document.getElementById('explain-cfg').addEventListener('click', handleExplainCFG); // (MỚI)
+            document.getElementById('cfg-to-language').addEventListener('click', handleCFGToLanguage); // (MỚI)
+
 
             // --- Modal ---
             const modal = document.getElementById('gemini-modal');
@@ -623,6 +763,9 @@
                     modal.style.display = "none";
                 }
             }
+
+            // (MỚI) Khởi tạo, ẩn panel CFG lúc đầu
+            document.getElementById('automata-type').dispatchEvent(new Event('change'));
         });
         
         // --- HÀM HỖ TRỢ GEMINI ---
@@ -632,9 +775,16 @@
         }
 
         /**
-         * Chuyển đổi đồ thị hiện tại thành một mô tả bằng văn bản cho LLM.
+         * Chuyển đổi đồ thị/ngữ pháp hiện tại thành một mô tả bằng văn bản cho LLM.
          */
-        function serializeGraph() {
+        function serializeAutomata() { // Đổi tên từ serializeGraph
+            if (automataType === 'CFG') {
+                let desc = `Đây là một Ngữ pháp Phi ngữ cảnh (CFG).\n`;
+                desc += `Các quy tắc (Rules):\n${document.getElementById('cfg-rules-input').value}\n`;
+                return desc;
+            }
+
+            // Logic cũ (DFA/NFA/TM)
             let desc = `Đây là một ${automataType}.\n`;
             desc += `Bảng chữ cái (Alphabet): {${Array.from(alphabet).join(', ')}}\n`;
             desc += `Trạng thái bắt đầu (Start State): ${startState}\n`;
@@ -701,6 +851,8 @@
 
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Lỗi HTTP:", response.status, errorText);
                     throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
                 }
 
@@ -712,6 +864,9 @@
                     console.error("Phản hồi API không hợp lệ:", result);
                     if (result.candidates && result.candidates[0].finishReason === 'SAFETY') {
                         throw new Error("Yêu cầu bị chặn vì lý do an toàn.");
+                    }
+                    if (result.candidates && result.candidates[0].finishReason !== 'STOP') {
+                         throw new Error(`API dừng với lý do: ${result.candidates[0].finishReason}`);
                     }
                     throw new Error("Không nhận được nội dung từ API.");
                 }
@@ -725,7 +880,7 @@
         }
 
         /**
-         * Xử lý sự kiện "Tạo Đồ thị"
+         * Xử lý sự kiện "Tạo Đồ thị / Ngữ pháp"
          */
         async function handleGenerateGraph() {
             const prompt = document.getElementById('gemini-prompt').value;
@@ -735,10 +890,47 @@
             }
 
             const currentAutomataType = automataType; // Lấy loại automata hiện tại
-            const currentAlphabet = Array.from(alphabet).join(', ');
-            const currentBlankSymbol = document.getElementById('tm-blank-symbol').value.trim() || '_';
+            
+            if (currentAutomataType === 'CFG') {
+                // --- LOGIC TẠO CFG ---
+                const systemPrompt = `Bạn là một chuyên gia lý thuyết automata. Nhiệm vụ của bạn là tạo ra một Ngữ pháp Phi ngữ cảnh (CFG) dưới dạng JSON cho một ngôn ngữ L.
+Chỉ trả về JSON.
+Sử dụng "e" cho epsilon (chuỗi rỗng).
+Biến bắt đầu phải là 'S'.`;
+                const userPrompt = `Tạo một CFG cho ngôn ngữ sau: "${prompt}".`;
+                
+                const schema = {
+                    type: "OBJECT",
+                    properties: {
+                        startSymbol: { type: "STRING" },
+                        rules: { 
+                            type: "STRING",
+                            description: "Toàn bộ các quy tắc, mỗi quy tắc trên một dòng. Ví dụ: S -> aSb | e"
+                        }
+                    },
+                    required: ["startSymbol", "rules"]
+                };
 
-            const systemPrompt = `Bạn là một chuyên gia lý thuyết automata. Nhiệm vụ của bạn là tạo ra một cấu trúc đồ thị JSON dựa trên yêu cầu của người dùng.
+                const jsonString = await callGemini(systemPrompt, userPrompt, schema);
+                if (!jsonString) {
+                    showMessage("Không thể tạo CFG từ AI.", "error");
+                    return;
+                }
+                try {
+                    const cfgData = JSON.parse(jsonString);
+                    document.getElementById('cfg-rules-input').value = cfgData.rules;
+                    showMessage("Đã tạo quy tắc CFG!", "success");
+                } catch (e) {
+                    console.error("Lỗi parse JSON CFG:", e, jsonString);
+                    showMessage("Lỗi: AI trả về dữ liệu CFG không hợp lệ.", "error");
+                }
+
+            } else {
+                // --- LOGIC TẠO ĐỒ THỊ (DFA/NFA/TM) - (Code cũ) ---
+                const currentAlphabet = Array.from(alphabet).join(', ');
+                const currentBlankSymbol = document.getElementById('tm-blank-symbol').value.trim() || '_';
+
+                const systemPrompt = `Bạn là một chuyên gia lý thuyết automata. Nhiệm vụ của bạn là tạo ra một cấu trúc đồ thị JSON dựa trên yêu cầu của người dùng.
 Hãy tuân thủ nghiêm ngặt JSON schema được cung cấp.
 Sử dụng các ID trạng thái đơn giản như 'q0', 'q1', 'q2'.
 Đảm bảo 'startState' là một trong các ID trạng thái bạn đã tạo.
@@ -747,73 +939,74 @@ Sử dụng các ID trạng thái đơn giản như 'q0', 'q1', 'q2'.
 - ${currentAutomataType === 'TM' ? "Chỉ cung cấp các trường 'read', 'write', 'move' cho các cạnh." : "Chỉ cung cấp trường 'label' cho các cạnh."}
 - ${currentAutomataType === 'DFA' ? "Đảm bảo mọi trạng thái đều có đường chuyển cho mọi ký tự trong bảng chữ cái." : ""}
 - ${currentAutomataType === 'NFA' ? "Bạn có thể sử dụng 'e' cho đường chuyển epsilon trong trường 'label'." : ""}`;
-            
-            const userPrompt = `Tạo một ${currentAutomataType} cho yêu cầu sau: "${prompt}".
+                
+                const userPrompt = `Tạo một ${currentAutomataType} cho yêu cầu sau: "${prompt}".
 Bảng chữ cái là: {${currentAlphabet}}.
 ${currentAutomataType === 'TM' ? `Ký tự trống là: '${currentBlankSymbol}'.` : ''}
 Hãy tạo đồ thị.`;
 
-            // === SỬA LỖI: Tạo Schema Động ===
-            let edgeProperties = {
-                source: { type: "STRING" },
-                target: { type: "STRING" }
-            };
-            let edgeRequired = ["source", "target"];
+                // === SỬA LỖI: Tạo Schema Động ===
+                let edgeProperties = {
+                    source: { type: "STRING" },
+                    target: { type: "STRING" }
+                };
+                let edgeRequired = ["source", "target"];
 
-            if (currentAutomataType === 'TM') {
-                edgeProperties.read = { type: "STRING" };
-                edgeProperties.write = { type: "STRING" };
-                edgeProperties.move = { type: "STRING" };
-                edgeRequired.push("read", "write", "move");
-            } else { // DFA/NFA
-                edgeProperties.label = { type: "STRING" };
-                edgeRequired.push("label");
-            }
+                if (currentAutomataType === 'TM') {
+                    edgeProperties.read = { type: "STRING" };
+                    edgeProperties.write = { type: "STRING" };
+                    edgeProperties.move = { type: "STRING" };
+                    edgeRequired.push("read", "write", "move");
+                } else { // DFA/NFA
+                    edgeProperties.label = { type: "STRING" };
+                    edgeRequired.push("label");
+                }
 
-            // JSON Schema cho LLM
-            const schema = {
-                type: "OBJECT",
-                properties: {
-                    nodes: {
-                        type: "ARRAY",
-                        items: {
-                            type: "OBJECT",
-                            properties: { id: { type: "STRING" } },
-                            required: ["id"]
+                // JSON Schema cho LLM
+                const schema = {
+                    type: "OBJECT",
+                    properties: {
+                        nodes: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: { id: { type: "STRING" } },
+                                required: ["id"]
+                            }
+                        },
+                        edges: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: edgeProperties, // Sử dụng schema động
+                                required: edgeRequired // Sử dụng schema động
+                            }
+                        },
+                        startState: { type: "STRING" },
+                        finalStates: {
+                            type: "ARRAY",
+                            items: { type: "STRING" }
                         }
                     },
-                    edges: {
-                        type: "ARRAY",
-                        items: {
-                            type: "OBJECT",
-                            properties: edgeProperties, // Sử dụng schema động
-                            required: edgeRequired // Sử dụng schema động
-                        }
-                    },
-                    startState: { type: "STRING" },
-                    finalStates: {
-                        type: "ARRAY",
-                        items: { type: "STRING" }
-                    }
-                },
-                required: ["nodes", "edges", "startState", "finalStates"]
-            };
-            // === KẾT THÚC SỬA LỖI ===
+                    required: ["nodes", "edges", "startState", "finalStates"]
+                };
+                // === KẾT THÚC SỬA LỖI ===
 
-            const jsonString = await callGemini(systemPrompt, userPrompt, schema);
+                const jsonString = await callGemini(systemPrompt, userPrompt, schema);
 
-            if (!jsonString) {
-                showMessage("Không thể tạo đồ thị từ AI.", "error");
-                return;
-            }
+                if (!jsonString) {
+                    showMessage("Không thể tạo đồ thị từ AI.", "error");
+                    return;
+                }
 
-            try {
-                const graphData = JSON.parse(jsonString);
-                // SỬA LỖI 2: Truyền loại automata đã tạo vào hàm vẽ
-                drawGraphFromData(graphData, currentAutomataType);
-            } catch (e) {
-                console.error("Lỗi parse JSON từ Gemini:", e, jsonString);
-                showMessage("Lỗi: AI trả về dữ liệu không hợp lệ.", "error");
+                try {
+                    const graphData = JSON.parse(jsonString);
+                    // SỬA LỖI 2: Truyền loại automata đã tạo vào hàm vẽ
+                    drawGraphFromData(graphData, currentAutomataType);
+                } catch (e) {
+                    console.error("Lỗi parse JSON từ Gemini:", e, jsonString);
+                    showMessage("Lỗi: AI trả về dữ liệu không hợp lệ.", "error");
+                }
             }
         }
 
@@ -821,12 +1014,16 @@ Hãy tạo đồ thị.`;
          * Xử lý sự kiện "Giải thích Automata"
          */
         async function handleExplainAutomata() {
+            if (automataType === 'CFG') {
+                showMessage("Chức năng này dành cho DFA/NFA/TM.", "error");
+                return;
+            }
             if (!startState) {
                 showMessage("Vui lòng đặt trạng thái bắt đầu trước.", "error");
                 return;
             }
             
-            const graphDescription = serializeGraph();
+            const graphDescription = serializeAutomata(); // Đã đổi tên
             const systemPrompt = "Bạn là một giáo sư khoa học máy tính chuyên về lý thuyết automata. Hãy giải thích ngắn gọn, rõ ràng bằng tiếng Việt, ngôn ngữ mà automata này chấp nhận. Tập trung vào mục đích của nó.";
             const userPrompt = `Dựa vào mô tả automata sau, hãy giải thích nó:\n\n${graphDescription}`;
             
@@ -844,17 +1041,77 @@ Hãy tạo đồ thị.`;
                 explanationDiv.textContent = "Không thể tạo lời giải thích. Vui lòng thử lại.";
             }
         }
+
+        /**
+         * (MỚI) Xử lý sự kiện "Giải thích CFG"
+         */
+        async function handleExplainCFG() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if (!rules.trim()) {
+                showMessage("Vui lòng nhập hoặc tạo quy tắc CFG.", "error");
+                return;
+            }
+
+            const systemPrompt = "Bạn là một giáo sư khoa học máy tính chuyên về lý thuyết automata. Hãy giải thích ngắn gọn, rõ ràng bằng tiếng Việt, ngôn ngữ mà Ngữ pháp Phi ngữ cảnh (CFG) này tạo ra. Tập trung vào mục đích của nó.";
+            const userPrompt = `Dựa vào các quy tắc CFG sau, hãy giải thích nó:\n\n${rules}`;
+            
+            const modal = document.getElementById('gemini-modal');
+            const explanationDiv = document.getElementById('gemini-explanation');
+            
+            explanationDiv.textContent = "Đang phân tích ngữ pháp của bạn...";
+            modal.style.display = "block";
+            
+            const explanation = await callGemini(systemPrompt, userPrompt);
+            
+            if (explanation) {
+                explanationDiv.textContent = explanation;
+            } else {
+                explanationDiv.textContent = "Không thể tạo lời giải thích.";
+            }
+        }
+
+        /**
+         * (MỚI) Xử lý sự kiện "CFG -> Ngôn ngữ L"
+         */
+        async function handleCFGToLanguage() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if (!rules.trim()) {
+                showMessage("Vui lòng nhập hoặc tạo quy tắc CFG.", "error");
+                return;
+            }
+
+            const systemPrompt = "Bạn là một chuyên gia lý thuyết automata. Nhiệm vụ của bạn là suy ra định nghĩa ngôn ngữ (L) chính tắc từ một CFG. Chỉ trả về định nghĩa ngôn ngữ (ví dụ: L = {a^n b^n | n >= 0}).";
+            const userPrompt = `Suy ra ngôn ngữ L từ các quy tắc CFG sau:\n\n${rules}`;
+            
+            const modal = document.getElementById('gemini-modal');
+            const explanationDiv = document.getElementById('gemini-explanation');
+            
+            explanationDiv.textContent = "Đang suy luận ngôn ngữ...";
+            modal.style.display = "block";
+            
+            const language = await callGemini(systemPrompt, userPrompt);
+            
+            if (language) {
+                explanationDiv.textContent = language;
+            } else {
+                explanationDiv.textContent = "Không thể suy luận ra ngôn ngữ.";
+            }
+        }
         
         /**
          * Xử lý sự kiện "Gợi ý Test"
          */
         async function handleSuggestTestCases() {
+            if (automataType === 'CFG') {
+                showMessage("Chức năng này dành cho DFA/NFA/TM.", "error");
+                return;
+            }
             if (!startState) {
                 showMessage("Vui lòng đặt trạng thái bắt đầu trước.", "error");
                 return;
             }
 
-            const graphDescription = serializeGraph();
+            const graphDescription = serializeAutomata(); // Đã đổi tên
             const systemPrompt = "Bạn là một công cụ kiểm thử automata. Chỉ trả về đối tượng JSON theo schema. Không giải thích.";
             const userPrompt = `Tạo 5 chuỗi nên "Chấp nhận" (accept) và 5 chuỗi nên "Từ chối" (reject) cho automata sau. Chỉ sử dụng các ký tự từ bảng chữ cái đã cho. ${graphDescription}`;
             
@@ -911,6 +1168,95 @@ Hãy tạo đồ thị.`;
             }
         }
 
+        /**
+         * (MỚI) Xử lý sự kiện "Sinh chuỗi & Cây phân giải" cho CFG
+         */
+        async function handleGenerateParseTrees() {
+            const rules = document.getElementById('cfg-rules-input').value;
+            if (!rules.trim()) {
+                showMessage("Vui lòng nhập hoặc tạo quy tắc CFG.", "error");
+                return;
+            }
+
+            // SỬA LỖI 400: Yêu cầu AI trả về một chuỗi JSON, không phải đối tượng JSON lồng nhau.
+            const systemPrompt = `Bạn là một chuyên gia về ngữ pháp phi ngữ cảnh.
+Nhiệm vụ của bạn là:
+1. Tạo ra 3 chuỗi ví dụ được chấp nhận bởi ngữ pháp (Grammar).
+2. Với MỖI chuỗi, tạo một cây phân giải (Parse Tree) dưới dạng một JSON string.
+3. Chỉ trả về JSON theo schema.
+4. Sử dụng 'e' cho epsilon. Các nút lá (terminals) phải là chuỗi, các nút cha (non-terminals) phải là đối tượng có 'node' và 'children'.
+Schema nút lá: "a"
+Schema nút cha: { "node": "S", "children": [ ... ] }
+Schema nút Epsilon: { "node": "e" }`;
+
+            const userPrompt = `Ngữ pháp (Grammar):\n${rules}`;
+            
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    examples: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                string: { type: "STRING" },
+                                // SỬA LỖI 400: Yêu cầu trả về string
+                                tree: { 
+                                    type: "STRING",
+                                    description: "Cây phân giải dưới dạng một JSON string."
+                                } 
+                            },
+                            required: ["string", "tree"]
+                        }
+                    }
+                },
+                required: ["examples"]
+            };
+
+            const jsonString = await callGemini(systemPrompt, userPrompt, schema);
+            if (!jsonString) {
+                showMessage("Không thể sinh cây phân giải.", "error");
+                return;
+            }
+
+            try {
+                const data = JSON.parse(jsonString);
+                parseTreeData = {}; // Xóa cây cũ
+                const container = document.getElementById('cfg-test-case-container');
+                container.innerHTML = '<p class="font-medium text-sm mt-2 text-green-600">Chuỗi ví dụ (click để xem cây):</p>';
+                
+                const ul = document.createElement('ul');
+                ul.className = 'list-disc list-inside';
+                
+                data.examples.forEach((example, index) => {
+                    const key = `tree-${index}`;
+                    
+                    // SỬA LỖI 400: Parse chuỗi JSON của cây
+                    try {
+                        const treeData = JSON.parse(example.tree);
+                        parseTreeData[key] = treeData; // Lưu dữ liệu cây đã parse
+                        
+                        const li = document.createElement('li');
+                        li.className = 'test-case-list text-gray-700 font-mono';
+                        li.textContent = example.string === "" ? "(chuỗi rỗng)" : example.string;
+                        li.onclick = () => {
+                            drawParseTree(parseTreeData[key]);
+                        };
+                        ul.appendChild(li);
+
+                    } catch (parseError) {
+                        console.error("Lỗi parse cây JSON từ AI:", parseError, example.tree);
+                        // Bỏ qua cây bị lỗi
+                    }
+                });
+                container.appendChild(ul);
+
+            } catch (e) {
+                console.error("Lỗi parse JSON cây phân giải:", e, jsonString);
+                showMessage("Lỗi: AI trả về dữ liệu cây không hợp lệ.", "error");
+            }
+        }
+
 
         // --- HÀM HỖ TRỢ ---
 
@@ -927,6 +1273,80 @@ Hãy tạo đồ thị.`;
             finalStates.clear();
             resetSimulation();
             document.getElementById('test-case-container').innerHTML = ''; // Xóa gợi ý test
+            document.getElementById('cfg-test-case-container').innerHTML = ''; // Xóa gợi ý CFG
+            parseTreeData = {};
+        }
+
+        // (MỚI) Hàm vẽ Cây Phân giải
+        function drawParseTree(treeData) {
+            clearGraph(); // Xóa đồ thị hiện tại
+            if (!treeData || !treeData.node) return;
+
+            let elements = [];
+            let nodeIdCounter = 0;
+
+            // Hàm đệ quy để xây dựng các phần tử
+            function buildTreeElements(node, parentId = null) {
+                if (typeof node === 'string') {
+                    // Nút lá (terminal)
+                    const id = `n${nodeIdCounter++}`;
+                    elements.push({
+                        group: 'nodes',
+                        data: { id: id, label: node },
+                        classes: 'parse-tree-terminal'
+                    });
+                    if (parentId) {
+                        elements.push({ group: 'edges', data: { source: parentId, target: id } });
+                    }
+                    return;
+                }
+
+                if (node.node === 'e') {
+                    // Nút lá Epsilon
+                    const id = `n${nodeIdCounter++}`;
+                    elements.push({
+                        group: 'nodes',
+                        data: { id: id, label: 'ε' }, // Hiển thị ký tự Epsilon
+                        classes: 'parse-tree-terminal parse-tree-epsilon'
+                    });
+                    if (parentId) {
+                        elements.push({ group: 'edges', data: { source: parentId, target: id } });
+                    }
+                    return;
+                }
+                
+                if (node.node) {
+                    // Nút cha (non-terminal)
+                    const id = `n${nodeIdCounter++}`;
+                    elements.push({
+                        group: 'nodes',
+                        data: { id: id, label: node.node },
+                        classes: 'parse-tree-non-terminal'
+                    });
+                    if (parentId) {
+                        elements.push({ group: 'edges', data: { source: parentId, target: id } });
+                    }
+
+                    if (node.children && Array.isArray(node.children)) {
+                        node.children.forEach(child => {
+                            buildTreeElements(child, id); // Đệ quy
+                        });
+                    }
+                }
+            }
+
+            buildTreeElements(treeData);
+            cy.add(elements);
+
+            // Chạy layout cây
+            cy.layout({
+                name: 'breadthfirst',
+                directed: true,
+                padding: 20,
+                grid: true,
+                spacingFactor: 1.2,
+                roots: '#n0' // Nút gốc
+            }).run();
         }
 
         // SỬA LỖI 2: Hàm vẽ đồ thị từ dữ liệu JSON (thêm tham số graphType)
@@ -940,7 +1360,7 @@ Hãy tạo đồ thị.`;
                     graphData.nodes.forEach(node => {
                         cy.add({
                             group: 'nodes',
-                            data: { id: node.id }
+                            data: { id: node.id, label: node.id } // Thêm label
                         });
                         // Cập nhật stateCounter
                         const match = node.id.match(/\d+/);
@@ -1031,16 +1451,21 @@ Hãy tạo đồ thị.`;
             // Xóa tất cả các lớp (class) highlight
             cy.elements().removeClass('current-state traversed-edge');
             
-            // Reset trạng thái bắt đầu (nếu có)
-            if (startState && cy.getElementById(startState).length > 0) {
+            // Reset trạng thái bắt đầu (nếu có và không phải CFG)
+            if (automataType !== 'CFG' && startState && cy.getElementById(startState).length > 0) {
                 // Chỉ thêm 'current-state' nếu chế độ không phải NFA (vì NFA xử lý epsilon closure)
                 if (automataType !== 'NFA') {
                     cy.getElementById(startState).addClass('current-state');
                 } else {
                     // NFA cần highlight bao đóng epsilon
                     const initialClosure = getEpsilonClosure(new Set([startState]));
-                    initialClosure.forEach(id => cy.getElementById(id).addClass('current-state'));
+                    initialClosure.forEach(id => {
+                        const el = cy.getElementById(id);
+                        if (el) el.addClass('current-state');
+                    });
                 }
+            } else if (automataType === 'CFG') {
+                // Không cần làm gì khi reset CFG, vì cây chỉ được vẽ khi click
             }
 
             // Đặt lại kết quả
@@ -1171,8 +1596,8 @@ Hãy tạo đồ thị.`;
 
         // 1. Kiểm tra tính hợp lệ
         function validateGraph() {
-            if (automataType === 'TM') {
-                showMessage("Chức năng kiểm tra tính hợp lệ cho Máy Turing chưa được triển khai.", "error");
+            if (automataType === 'TM' || automataType === 'CFG') {
+                showMessage("Chức năng kiểm tra tính hợp lệ hiện chỉ hỗ trợ DFA.", "error");
                 return;
             }
             
@@ -1241,6 +1666,11 @@ Hãy tạo đồ thị.`;
 
         // 2. Bắt đầu Mô phỏng (thay thế runTest)
         async function startSimulation() {
+            if (automataType === 'CFG') {
+                showMessage("Chức năng mô phỏng không dành cho CFG. Hãy dùng 'Sinh chuỗi & Cây phân giải'.", "error");
+                return;
+            }
+            
             const inputString = document.getElementById('test-string').value;
             const resultDisplay = document.getElementById('test-result');
             
@@ -1302,6 +1732,7 @@ Hãy tạo đồ thị.`;
         // 2a. Logic mô phỏng DFA (async)
         async function simulateDFA(inputString, speed) {
             let currentState = cy.getElementById(startState);
+            if (!currentState.length) throw new Error("Trạng thái bắt đầu không tồn tại.");
             currentState.addClass('current-state');
             await sleep(speed);
 
@@ -1357,7 +1788,10 @@ Hãy tạo đồ thị.`;
             
             // Highlight các trạng thái epsilon ban đầu
             cy.elements().removeClass('current-state');
-            currentStates.forEach(id => cy.getElementById(id).addClass('current-state'));
+            currentStates.forEach(id => {
+                 const el = cy.getElementById(id);
+                 if (el) el.addClass('current-state');
+            });
             await sleep(speed);
 
             for (const char of inputString) {
@@ -1370,6 +1804,7 @@ Hãy tạo đồ thị.`;
                 // 1. Tìm tất cả các trạng thái có thể đến được bằng ký tự 'char'
                 currentStates.forEach(nodeId => {
                     const node = cy.getElementById(nodeId);
+                    if (!node.length) return;
                     node.outgoers('edge').filter(e => e.data('tm_read') === undefined).forEach(edge => {
                         const symbols = edge.data('label').split(',');
                         if (symbols.includes(char)) {
@@ -1386,7 +1821,10 @@ Hãy tạo đồ thị.`;
 
                 // 3. Cập nhật UI
                 cy.elements().removeClass('current-state traversed-edge');
-                epsilonStates.forEach(id => cy.getElementById(id).addClass('current-state'));
+                epsilonStates.forEach(id => {
+                    const el = cy.getElementById(id);
+                    if (el) el.addClass('current-state');
+                });
                 
                 await sleep(speed / 2); // Cho thấy các nút mới
 
@@ -1419,6 +1857,7 @@ Hãy tạo đồ thị.`;
                 const nodeId = stack.pop();
                 if (!nodeId) continue;
                 const node = cy.getElementById(nodeId);
+                if (!node.length) continue;
                 
                 node.outgoers('edge').filter(e => e.data('tm_read') === undefined).forEach(edge => {
                     const symbols = edge.data('label').split(',');
@@ -1448,6 +1887,7 @@ Hãy tạo đồ thị.`;
 
             let head = 0;
             let currentState = cy.getElementById(startState);
+            if (!currentState.length) throw new Error("Trạng thái bắt đầu không tồn tại.");
             
             // Hàm render băng
             const renderTape = (currentHead) => {
@@ -1505,17 +1945,9 @@ Hãy tạo đồ thị.`;
 
                 // 4. Nếu kẹt
                 if (!foundEdge) {
-                    // === SỬA LỖI ===
-                    // Không ném lỗi. Kẹt ở trạng thái không chấp nhận có nghĩa là TỪ CHỐI.
-                    // Hàm `startSimulation` sẽ bắt `Error` và hiển thị nó.
-                    // Chúng ta nên ném lỗi để hàm `startSimulation` biết và hiển thị TỪ CHỐI
-                    // (Logic của hàm `startSimulation` là catch lỗi và return false)
-                    // Hoặc tốt hơn:
-                    // Vì chúng ta đã kiểm tra trạng thái chấp nhận ở đầu vòng lặp,
-                    // việc kẹt ở đây có nghĩa là kẹt ở trạng thái KHÔNG chấp nhận.
+                    // === SỬA LỖI (Giữ lại từ phiên bản trước) ===
+                    // Kẹt ở trạng thái không chấp nhận có nghĩa là TỪ CHỐI.
                     return false; // -> Từ chối
-                    // Dòng cũ bị lỗi:
-                    // throw new Error(`Máy Turing bị kẹt! Không có đường chuyển cho '${readSymbol}' tại ${currentState.id()}`);
                     // === KẾT THÚC SỬA LỖI ===
                 }
 
